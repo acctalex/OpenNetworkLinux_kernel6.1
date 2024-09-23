@@ -111,6 +111,9 @@ class OnlPlatform_x86_64_accton_as7326_56x_r0(OnlPlatformAccton,
                 ]
             )
 
+        # initialize pca9548 idle_state
+        subprocess.call('echo -2 | tee /sys/bus/i2c/drivers/pca954x/*-00*/idle_state > /dev/null', shell=True)
+
         sfp_map =  [
         42,41,44,43,47,45,46,50,
         48,49,52,51,53,56,55,54,
