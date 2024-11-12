@@ -147,6 +147,27 @@ static const struct attribute_group as9716_32d_psu_group = {
     .attrs = as9716_32d_psu_attributes,
 };
 
+static umode_t as9716_32d_psu_is_visible(const void *drvdata,
+                  enum hwmon_sensor_types type,
+                  u32 attr, int channel)
+{
+    return 0;
+}
+
+static const struct hwmon_channel_info *as9716_32d_psu_info[] = {
+    HWMON_CHANNEL_INFO(power, HWMON_F_ENABLE),
+    NULL,
+};
+
+static const struct hwmon_ops as9716_32d_psu_hwmon_ops = {
+    .is_visible = as9716_32d_psu_is_visible,
+};
+
+static const struct hwmon_chip_info as9716_32d_psu_chip_info = {
+    .ops = &as9716_32d_psu_hwmon_ops,
+    .info = as9716_32d_psu_info,
+};
+
 static int as9716_32d_psu_probe(struct i2c_client *client,
                                 const struct i2c_device_id *dev_id)
 {
@@ -178,7 +199,10 @@ static int as9716_32d_psu_probe(struct i2c_client *client,
     }
 
     data->hwmon_dev = hwmon_device_register_with_info(&client->dev, "as9716_32d_psu",
-                                                      NULL, NULL, NULL);
+                                                    NULL, 
+                                                    &as9716_32d_psu_chip_info,
+                                                    NULL);
+
     if (IS_ERR(data->hwmon_dev)) {
         status = PTR_ERR(data->hwmon_dev);
         goto exit_remove;
@@ -198,15 +222,13 @@ exit:
     return status;
 }
 
-static int as9716_32d_psu_remove(struct i2c_client *client)
+static void as9716_32d_psu_remove(struct i2c_client *client)
 {
     struct as9716_32d_psu_data *data = i2c_get_clientdata(client);
 
     hwmon_device_unregister(data->hwmon_dev);
     sysfs_remove_group(&client->dev.kobj, &as9716_32d_psu_group);
     kfree(data);
-
-    return 0;
 }
 
 enum psu_index
