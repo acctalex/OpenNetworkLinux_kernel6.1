@@ -66,7 +66,7 @@ struct as4630_54te_psu_data {
 };
 
 static struct as4630_54te_psu_data*as4630_54te_psu_update_device(
-													struct device *dev);
+					struct device *dev);
 
 enum as4630_54te_psu_sysfs_attributes {
 	PSU_PRESENT,
@@ -153,8 +153,29 @@ static const struct attribute_group as4630_54te_psu_group = {
 	.attrs = as4630_54te_psu_attributes,
 };
 
+static umode_t as4630_54te_psu_is_visible(const void *drvdata,
+			enum hwmon_sensor_types type,
+			u32 attr, int channel)
+{
+	return 0;
+}
+
+static const struct hwmon_channel_info *as4630_54te_psu_info[] = {
+	HWMON_CHANNEL_INFO(power, HWMON_F_ENABLE),
+	NULL,
+};
+
+static const struct hwmon_ops as4630_54te_psu_hwmon_ops = {
+	.is_visible = as4630_54te_psu_is_visible,
+};
+
+static const struct hwmon_chip_info as4630_54te_psu_chip_info = {
+	.ops = &as4630_54te_psu_hwmon_ops,
+	.info = as4630_54te_psu_info,
+};
+
 static int as4630_54te_psu_probe(struct i2c_client *client,
-								const struct i2c_device_id *dev_id)
+				const struct i2c_device_id *dev_id)
 {
 	struct as4630_54te_psu_data *data;
 	int status;
@@ -183,8 +204,11 @@ static int as4630_54te_psu_probe(struct i2c_client *client,
 		goto exit_free;
 	}
 
-	data->hwmon_dev = hwmon_device_register_with_info(&client->dev,
-									"as4630_54te_psu", NULL, NULL, NULL);
+	data->hwmon_dev = hwmon_device_register_with_info(&client->dev, "as4630_54te_psu",
+							NULL,
+							&as4630_54te_psu_chip_info,
+							NULL);
+
 	if (IS_ERR(data->hwmon_dev)) {
 		status = PTR_ERR(data->hwmon_dev);
 		goto exit_remove;
@@ -204,15 +228,13 @@ exit:
 	return status;
 }
 
-static int as4630_54te_psu_remove(struct i2c_client *client)
+static void as4630_54te_psu_remove(struct i2c_client *client)
 {
 	struct as4630_54te_psu_data *data = i2c_get_clientdata(client);
 
 	hwmon_device_unregister(data->hwmon_dev);
 	sysfs_remove_group(&client->dev.kobj, &as4630_54te_psu_group);
 	kfree(data);
-
-	return 0;
 }
 
 enum psu_index {
@@ -239,7 +261,7 @@ static struct i2c_driver as4630_54te_psu_driver = {
 };
 
 static int as4630_54te_psu_read_block(struct i2c_client *client, u8 command,
-									u8 *data, int data_len)
+					u8 *data, int data_len)
 {
 	int result = 0;
 	int retry_count = 5;
@@ -300,13 +322,13 @@ as4630_54te_psu_data *as4630_54te_psu_update_device(struct device *dev)
 
 		if (power_good) {
 			status = as4630_54te_psu_read_block(client, 0x20,
-											data->model_name,
-											ARRAY_SIZE(data->model_name)-1);
+							data->model_name,
+							ARRAY_SIZE(data->model_name)-1);
 			if (status < 0) {
 				data->model_name[0] = '\0';
 				dev_dbg(&client->dev,
-						"unable to read model name from (0x%x) offset(0x20)\n",
-						client->addr);
+				"unable to read model name from (0x%x) offset(0x20)\n",
+				client->addr);
 			}
 			else {
 				data->model_name[8] = '-';
@@ -321,13 +343,13 @@ as4630_54te_psu_data *as4630_54te_psu_update_device(struct device *dev)
 
 			/* Read from offset 0x2e or 0x35 (18 bytes) */
 			status = as4630_54te_psu_read_block(client, serial_offset,
-											data->serial_number,
-											ARRAY_SIZE(data->serial_number)-1);
+							data->serial_number,
+							ARRAY_SIZE(data->serial_number)-1);
 			if (status < 0) {
 				data->serial_number[0] = '\0';
 				dev_dbg(&client->dev,
-						"unable to read serial from (0x%x) offset(0x%x)\n",
-						client->addr, serial_offset);
+					"unable to read serial from (0x%x) offset(0x%x)\n",
+					client->addr, serial_offset);
 			}
 			data->serial_number[ARRAY_SIZE(data->serial_number)-1]= '\0';
 		}
