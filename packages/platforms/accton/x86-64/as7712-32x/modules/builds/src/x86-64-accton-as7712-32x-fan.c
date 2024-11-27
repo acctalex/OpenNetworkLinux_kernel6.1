@@ -278,18 +278,18 @@ static ssize_t set_duty_cycle(struct device *dev, struct device_attribute *da,
 	if (value < 0 || value > FAN_MAX_DUTY_CYCLE) {
 		return -EINVAL;
 	}
-	
+
     mutex_lock(&data->update_lock);
 
 	/* Disable the watchdog timer
 	 */
 	error = as7712_32x_fan_write_value(client, 0x33, 0);
-	
+
 	if (error != 0) {
 		dev_dbg(&client->dev, "Unable to disable the watchdog timer\n");
 		mutex_unlock(&data->update_lock);
 		return error;
-	}	
+	}
 
 	as7712_32x_fan_write_value(client, fan_reg[FAN_DUTY_CYCLE_PERCENTAGE], duty_cycle_to_reg_val(value));
 	data->valid = 0;
@@ -361,11 +361,11 @@ static ssize_t fan_show_value(struct device *dev, struct device_attribute *da,
                 break;
             default:
                 break;
-        }        
+        }
     }
 
     mutex_unlock(&data->update_lock);
-    
+
     return ret;
 }
 
@@ -384,12 +384,12 @@ static struct as7712_32x_fan_data *as7712_32x_fan_update_device(struct device *d
 
         dev_dbg(&client->dev, "Starting as7712_32x_fan update\n");
         data->valid = 0;
-        
+
         /* Update fan data
          */
         for (i = 0; i < ARRAY_SIZE(data->reg_val); i++) {
             int status = as7712_32x_fan_read_value(client, fan_reg[i]);
-            
+
             if (status < 0) {
                 data->valid = 0;
                 mutex_unlock(&data->update_lock);
@@ -407,6 +407,27 @@ static struct as7712_32x_fan_data *as7712_32x_fan_update_device(struct device *d
 
     return data;
 }
+
+static umode_t as7712_32x_fan_is_visible(const void *drvdata,
+                  enum hwmon_sensor_types type,
+                  u32 attr, int channel)
+{
+    return 0;
+}
+
+static const struct hwmon_channel_info *as7712_32x_fan_info[] = {
+    HWMON_CHANNEL_INFO(fan, HWMON_F_ENABLE),
+    NULL,
+};
+
+static const struct hwmon_ops as7712_32x_fan_hwmon_ops = {
+    .is_visible = as7712_32x_fan_is_visible,
+};
+
+static const struct hwmon_chip_info as7712_32x_fan_chip_info = {
+    .ops = &as7712_32x_fan_hwmon_ops,
+    .info = as7712_32x_fan_info,
+};
 
 static int as7712_32x_fan_probe(struct i2c_client *client,
             const struct i2c_device_id *dev_id)
@@ -437,8 +458,12 @@ static int as7712_32x_fan_probe(struct i2c_client *client,
         goto exit_free;
     }
 
-    data->hwmon_dev = hwmon_device_register_with_info(&client->dev, "as7712_32x_fan",
-                                                      NULL, NULL, NULL);
+    data->hwmon_dev = hwmon_device_register_with_info(&client->dev, 
+                                                "as7712_32x_fan",
+                                                NULL, 
+                                                &as7712_32x_fan_chip_info, 
+                                                NULL);
+
     if (IS_ERR(data->hwmon_dev)) {
         status = PTR_ERR(data->hwmon_dev);
         goto exit_remove;
@@ -446,7 +471,7 @@ static int as7712_32x_fan_probe(struct i2c_client *client,
 
     dev_info(&client->dev, "%s: fan '%s'\n",
          dev_name(data->hwmon_dev), client->name);
-    
+
     return 0;
 
 exit_remove:
@@ -454,17 +479,15 @@ exit_remove:
 exit_free:
     kfree(data);
 exit:
-    
+
     return status;
 }
 
-static int as7712_32x_fan_remove(struct i2c_client *client)
+static void as7712_32x_fan_remove(struct i2c_client *client)
 {
     struct as7712_32x_fan_data *data = i2c_get_clientdata(client);
     hwmon_device_unregister(data->hwmon_dev);
     sysfs_remove_group(&client->dev.kobj, &as7712_32x_fan_group);
-    
-    return 0;
 }
 
 /* Addresses to scan */

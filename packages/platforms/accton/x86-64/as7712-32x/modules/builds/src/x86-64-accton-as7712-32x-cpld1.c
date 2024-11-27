@@ -152,8 +152,8 @@ DECLARE_TRANSCEIVER_SENSOR_DEVICE_ATTR(31);
 DECLARE_TRANSCEIVER_SENSOR_DEVICE_ATTR(32);
 
 static struct attribute *as7712_32x_cpld_attributes[] = {
-    &sensor_dev_attr_version.dev_attr.attr,
-    &sensor_dev_attr_access.dev_attr.attr,
+	&sensor_dev_attr_version.dev_attr.attr,
+	&sensor_dev_attr_access.dev_attr.attr,
 	/* transceiver attributes */
 	&sensor_dev_attr_module_present_all.dev_attr.attr,
 	DECLARE_TRANSCEIVER_ATTR(1),
@@ -208,7 +208,7 @@ static ssize_t show_present_all(struct device *dev, struct device_attribute *da,
 
     for (i = 0; i < ARRAY_SIZE(regs); i++) {
         status = as7712_32x_cpld_read_internal(client, regs[i]);
-        
+
         if (status < 0) {
             goto exit;
         }
@@ -231,9 +231,9 @@ exit:
 static ssize_t show_present(struct device *dev, struct device_attribute *da,
              char *buf)
 {
-    struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
-    struct i2c_client *client = to_i2c_client(dev);
-    struct as7712_32x_cpld_data *data = i2c_get_clientdata(client);
+	struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
+	struct i2c_client *client = to_i2c_client(dev);
+	struct as7712_32x_cpld_data *data = i2c_get_clientdata(client);
 	int status = 0;
 	u8 reg = 0, mask = 0;
 
@@ -259,7 +259,7 @@ static ssize_t show_present(struct device *dev, struct device_attribute *da,
 	}
 
 
-    mutex_lock(&data->update_lock);
+	mutex_lock(&data->update_lock);
 	status = as7712_32x_cpld_read_internal(client, reg);
 	if (unlikely(status < 0)) {
 		goto exit;
@@ -277,9 +277,9 @@ static ssize_t show_version(struct device *dev, struct device_attribute *da,
              char *buf)
 {
 	u8 reg = 0, mask = 0;
-    struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
-    struct i2c_client *client = to_i2c_client(dev);
-    struct as7712_32x_cpld_data *data = i2c_get_clientdata(client);
+	struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
+	struct i2c_client *client = to_i2c_client(dev);
+	struct as7712_32x_cpld_data *data = i2c_get_clientdata(client);
 	int status = 0;
 
 	switch (attr->index) {
@@ -309,8 +309,8 @@ static ssize_t access(struct device *dev, struct device_attribute *da,
 {
 	int status;
 	u32 addr, val;
-    struct i2c_client *client = to_i2c_client(dev);
-    struct as7712_32x_cpld_data *data = i2c_get_clientdata(client);
+	struct i2c_client *client = to_i2c_client(dev);
+	struct as7712_32x_cpld_data *data = i2c_get_clientdata(client);
 
 	if (sscanf(buf, "0x%x 0x%x", &addr, &val) != 2) {
 		return -EINVAL;
@@ -348,7 +348,7 @@ static int as7712_32x_cpld_read_internal(struct i2c_client *client, u8 reg)
 		break;
 	}
 
-    return status;
+	return status;
 }
 
 static int as7712_32x_cpld_write_internal(struct i2c_client *client, u8 reg, u8 value)
@@ -372,14 +372,14 @@ static int as7712_32x_cpld_write_internal(struct i2c_client *client, u8 reg, u8 
 static void as7712_32x_cpld_add_client(struct i2c_client *client)
 {
 	struct cpld_client_node *node = kzalloc(sizeof(struct cpld_client_node), GFP_KERNEL);
-	
+
 	if (!node) {
 		dev_dbg(&client->dev, "Can't allocate cpld_client_node (0x%x)\n", client->addr);
 		return;
 	}
-	
+
 	node->client = client;
-	
+
 	mutex_lock(&list_lock);
 	list_add(&node->list, &cpld_client_list);
 	mutex_unlock(&list_lock);
@@ -390,7 +390,7 @@ static void as7712_32x_cpld_remove_client(struct i2c_client *client)
 	struct list_head		*list_node = NULL;
 	struct cpld_client_node *cpld_node = NULL;
 	int found = 0;
-	
+
 	mutex_lock(&list_lock);
 
 	list_for_each(list_node, &cpld_client_list)
@@ -402,14 +402,35 @@ static void as7712_32x_cpld_remove_client(struct i2c_client *client)
 			break;
 		}
 	}
-	
+
 	if (found) {
 		list_del(list_node);
 		kfree(cpld_node);
 	}
-	
+
 	mutex_unlock(&list_lock);
 }
+
+static umode_t as7712_32x_cpld_is_visible(const void *drvdata,
+                  enum hwmon_sensor_types type,
+                  u32 attr, int channel)
+{
+    return 0;
+}
+
+static const struct hwmon_channel_info *as7712_32x_cpld_info[] = {
+    HWMON_CHANNEL_INFO(chip, HWMON_C_REGISTER_TZ),
+    NULL,
+};
+
+static const struct hwmon_ops as7712_32x_cpld_hwmon_ops = {
+    .is_visible = as7712_32x_cpld_is_visible,
+};
+
+static const struct hwmon_chip_info as7712_32x_cpld_chip_info = {
+    .ops = &as7712_32x_cpld_hwmon_ops,
+    .info = as7712_32x_cpld_info,
+};
 
 static int as7712_32x_cpld_probe(struct i2c_client *client,
             const struct i2c_device_id *dev_id)
@@ -440,7 +461,10 @@ static int as7712_32x_cpld_probe(struct i2c_client *client,
 	}
 
     data->hwmon_dev = hwmon_device_register_with_info(&client->dev, "as7712_32x_cpld",
-                                                      NULL, NULL, NULL);
+                                                NULL, 
+                                                &as7712_32x_cpld_chip_info, 
+                                                NULL);
+
 	if (IS_ERR(data->hwmon_dev)) {
 		status = PTR_ERR(data->hwmon_dev);
 		goto exit_remove;
@@ -458,20 +482,18 @@ exit_remove:
 exit_free:
     kfree(data);
 exit:
-    
+
     return status;
 }
 
-static int as7712_32x_cpld_remove(struct i2c_client *client)
+static void as7712_32x_cpld_remove(struct i2c_client *client)
 {
     struct as7712_32x_cpld_data *data = i2c_get_clientdata(client);
 
     hwmon_device_unregister(data->hwmon_dev);
     sysfs_remove_group(&client->dev.kobj, &as7712_32x_cpld_group);
     kfree(data);
-	as7712_32x_cpld_remove_client(client);
-
-    return 0;
+    as7712_32x_cpld_remove_client(client);
 }
 
 int as7712_32x_cpld_read(unsigned short cpld_addr, u8 reg)
@@ -479,19 +501,19 @@ int as7712_32x_cpld_read(unsigned short cpld_addr, u8 reg)
 	struct list_head   *list_node = NULL;
 	struct cpld_client_node *cpld_node = NULL;
 	int ret = -EPERM;
-	
+
 	mutex_lock(&list_lock);
 
 	list_for_each(list_node, &cpld_client_list)
 	{
 		cpld_node = list_entry(list_node, struct cpld_client_node, list);
-		
+
 		if (cpld_node->client->addr == cpld_addr) {
 			ret = i2c_smbus_read_byte_data(cpld_node->client, reg);
 			break;
 		}
 	}
-	
+
 	mutex_unlock(&list_lock);
 
 	return ret;
@@ -503,19 +525,19 @@ int as7712_32x_cpld_write(unsigned short cpld_addr, u8 reg, u8 value)
 	struct list_head   *list_node = NULL;
 	struct cpld_client_node *cpld_node = NULL;
 	int ret = -EIO;
-	
+
 	mutex_lock(&list_lock);
 
 	list_for_each(list_node, &cpld_client_list)
 	{
 		cpld_node = list_entry(list_node, struct cpld_client_node, list);
-		
+
 		if (cpld_node->client->addr == cpld_addr) {
 			ret = i2c_smbus_write_byte_data(cpld_node->client, reg, value);
 			break;
 		}
 	}
-	
+
 	mutex_unlock(&list_lock);
 
 	return ret;

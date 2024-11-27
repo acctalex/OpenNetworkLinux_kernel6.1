@@ -101,8 +101,8 @@ static struct attribute *as7712_32x_psu_attributes[] = {
 static ssize_t show_status(struct device *dev, struct device_attribute *da,
              char *buf)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct as7712_32x_psu_data *data = i2c_get_clientdata(client);
+    struct i2c_client *client = to_i2c_client(dev);
+    struct as7712_32x_psu_data *data = i2c_get_clientdata(client);
     struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
     u8 status = 0;
 
@@ -130,16 +130,16 @@ static ssize_t show_string(struct device *dev, struct device_attribute *da,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct as7712_32x_psu_data *data = i2c_get_clientdata(client);
-    struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
-    char *ptr = NULL;
+        struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
+        char *ptr = NULL;
 
-    mutex_lock(&data->update_lock);
+        mutex_lock(&data->update_lock);
 
-    data = as7712_32x_psu_update_device(dev);
-    if (!data->valid) {
-        mutex_unlock(&data->update_lock);
-        return -EIO;
-    }
+        data = as7712_32x_psu_update_device(dev);
+        if (!data->valid) {
+                mutex_unlock(&data->update_lock);
+                return -EIO;
+        }
 
 	switch (attr->index) {
 	case PSU_MODEL_NAME:
@@ -156,12 +156,33 @@ static ssize_t show_string(struct device *dev, struct device_attribute *da,
 		return -EINVAL;
 	}
 
-    mutex_unlock(&data->update_lock);
-    return sprintf(buf, "%s\n", ptr);
+        mutex_unlock(&data->update_lock);
+        return sprintf(buf, "%s\n", ptr);
 }
 
 static const struct attribute_group as7712_32x_psu_group = {
     .attrs = as7712_32x_psu_attributes,
+};
+
+static umode_t as7712_32x_psu_is_visible(const void *drvdata,
+                  enum hwmon_sensor_types type,
+                  u32 attr, int channel)
+{
+    return 0;
+}
+
+static const struct hwmon_channel_info *as7712_32x_psu_info[] = {
+    HWMON_CHANNEL_INFO(power, HWMON_P_ENABLE),
+    NULL,
+};
+
+static const struct hwmon_ops as7712_32x_psu_hwmon_ops = {
+    .is_visible = as7712_32x_psu_is_visible,
+};
+
+static const struct hwmon_chip_info as7712_32x_psu_chip_info = {
+    .ops = &as7712_32x_psu_hwmon_ops,
+    .info = as7712_32x_psu_info,
 };
 
 static int as7712_32x_psu_probe(struct i2c_client *client,
@@ -195,7 +216,10 @@ static int as7712_32x_psu_probe(struct i2c_client *client,
     }
 
     data->hwmon_dev = hwmon_device_register_with_info(&client->dev, "as7712_32x_psu",
-                                                      NULL, NULL, NULL);
+                                                    NULL, 
+                                                    &as7712_32x_psu_chip_info, 
+                                                    NULL);
+
     if (IS_ERR(data->hwmon_dev)) {
         status = PTR_ERR(data->hwmon_dev);
         goto exit_remove;
@@ -211,19 +235,17 @@ exit_remove:
 exit_free:
     kfree(data);
 exit:
-    
+
     return status;
 }
 
-static int as7712_32x_psu_remove(struct i2c_client *client)
+static void as7712_32x_psu_remove(struct i2c_client *client)
 {
     struct as7712_32x_psu_data *data = i2c_get_clientdata(client);
 
     hwmon_device_unregister(data->hwmon_dev);
     sysfs_remove_group(&client->dev.kobj, &as7712_32x_psu_group);
     kfree(data);
-    
-    return 0;
 }
 
 enum psu_index 
@@ -255,27 +277,27 @@ static int as7712_32x_psu_read_block(struct i2c_client *client, u8 command, u8 *
 {
     int result = 0;
     int retry_count = 5;
-    
+
     while (retry_count) {
         retry_count--;
-    
+
         result = i2c_smbus_read_i2c_block_data(client, command, data_len, data);
         
         if (unlikely(result < 0)) {
             msleep(10);
             continue;
         }
-        
+
         if (unlikely(result != data_len)) {
             result = -EIO;
             msleep(10);
             continue;
         }
-        
+
         result = 0;
         break;
     }
-    
+
     return result;
 }
 
@@ -391,7 +413,7 @@ static struct as7712_32x_psu_data *as7712_32x_psu_update_device(struct device *d
         else {
             data->status = status;
         }
-        
+
         /* Read model name */
         memset(data->model_name, 0, sizeof(data->model_name));
         memset(data->fan_dir, 0, sizeof(data->fan_dir));
@@ -422,7 +444,7 @@ static struct as7712_32x_psu_data *as7712_32x_psu_update_device(struct device *d
                 goto exit;
             }
         }
-        
+
         data->last_updated = jiffies;
         data->valid = 1;
     }

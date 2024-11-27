@@ -112,14 +112,11 @@ static struct led_type_mode led_type_mode_data[] = {
 
 
 static void accton_as7712_32x_led_set(struct led_classdev *led_cdev,
-									  enum led_brightness led_light_mode, enum led_type type);
-									  
-
-
-
+					enum led_brightness led_light_mode, 
+					enum led_type type);
 
 static int accton_getLedReg(enum led_type type, u8 *reg)
-{	 
+{
 	int i;
 	for (i = 0; i < ARRAY_SIZE(led_reg_map); i++) {	
 		if(led_reg_map[i].types & (type<<1)){
@@ -133,26 +130,26 @@ static int accton_getLedReg(enum led_type type, u8 *reg)
 
 static int led_reg_val_to_light_mode(enum led_type type, u8 reg_val) {
 	int i;
-	
+
 	for (i = 0; i < ARRAY_SIZE(led_type_mode_data); i++) {
 
 		if (type != led_type_mode_data[i].type)
 			continue;
-		   
+
 		if ((led_type_mode_data[i].reg_bit_mask & reg_val) == 
 			 led_type_mode_data[i].mode_value)
 		{
 			return led_type_mode_data[i].mode;
 		}
 	}
-	
+
 	return 0;
 }
 
 static u8 led_light_mode_to_reg_val(enum led_type type, 
 									enum led_light_mode mode, u8 reg_val) {
 	int i;
-									  
+
 	for (i = 0; i < ARRAY_SIZE(led_type_mode_data); i++) {
 		if (type != led_type_mode_data[i].type)
 			continue;
@@ -164,7 +161,7 @@ static u8 led_light_mode_to_reg_val(enum led_type type,
 					 (reg_val & (~led_type_mode_data[i].reg_bit_mask));
 		break;
 	}
-	
+
 	return reg_val;
 }
 
@@ -203,18 +200,18 @@ static void accton_as7712_32x_led_update(void)
 				ledctl->reg_val[i] = status; 
 			}
 		}
-		
+
 		ledctl->last_updated = jiffies;
 		ledctl->valid = 1;
 	}
-	
-exit:	
+
+exit:
 	mutex_unlock(&ledctl->update_lock);
 }
 
 static void accton_as7712_32x_led_set(struct led_classdev *led_cdev,
-									  enum led_brightness led_light_mode, 
-									  enum led_type type)
+					enum led_brightness led_light_mode, 
+					enum led_type type)
 {
 	int reg_val;
 	u8 reg	;
@@ -224,7 +221,7 @@ static void accton_as7712_32x_led_set(struct led_classdev *led_cdev,
 	{
 		dev_dbg(&ledctl->pdev->dev, "Not match item for %d.\n", type);
 	}
-	
+
 	reg_val = accton_as7712_32x_led_read_value(reg);
 	
 	if (reg_val < 0) {
@@ -243,7 +240,7 @@ exit:
 
 
 static void accton_as7712_32x_led_diag_set(struct led_classdev *led_cdev,
-										   enum led_brightness led_light_mode)
+					enum led_brightness led_light_mode)
 {
 	accton_as7712_32x_led_set(led_cdev, led_light_mode,  LED_TYPE_DIAG);
 }
@@ -255,7 +252,7 @@ static enum led_brightness accton_as7712_32x_led_diag_get(struct led_classdev *c
 }
 
 static void accton_as7712_32x_led_loc_set(struct led_classdev *led_cdev,
-										  enum led_brightness led_light_mode)
+					enum led_brightness led_light_mode)
 {
 	accton_as7712_32x_led_set(led_cdev, led_light_mode, LED_TYPE_LOC);
 }
@@ -267,7 +264,7 @@ static enum led_brightness accton_as7712_32x_led_loc_get(struct led_classdev *cd
 }
 
 static void accton_as7712_32x_led_auto_set(struct led_classdev *led_cdev,
-										   enum led_brightness led_light_mode)
+					enum led_brightness led_light_mode)
 {
 }
 
@@ -323,7 +320,7 @@ static int accton_as7712_32x_led_suspend(struct platform_device *dev,
 		pm_message_t state)
 {
 	int i = 0;
-	
+
 	for (i = 0; i < ARRAY_SIZE(accton_as7712_32x_leds); i++) {
 		led_classdev_suspend(&accton_as7712_32x_leds[i]);
 	}
@@ -334,7 +331,7 @@ static int accton_as7712_32x_led_suspend(struct platform_device *dev,
 static int accton_as7712_32x_led_resume(struct platform_device *dev)
 {
 	int i = 0;
-	
+
 	for (i = 0; i < ARRAY_SIZE(accton_as7712_32x_leds); i++) {
 		led_classdev_resume(&accton_as7712_32x_leds[i]);
 	}
@@ -352,7 +349,7 @@ static int accton_as7712_32x_led_probe(struct platform_device *pdev)
 		if (ret < 0)
 			break;
 	}
-	
+
 	/* Check if all LEDs were successfully registered */
 	if (i != ARRAY_SIZE(accton_as7712_32x_leds)){
 		int j;
@@ -392,11 +389,6 @@ static int __init accton_as7712_32x_led_init(void)
 {
 	int ret;
 
-	extern int platform_accton_as7712_32x(void);
-	if (!platform_accton_as7712_32x()) {
-		return -ENODEV;
-	}	
-	
 	ret = platform_driver_register(&accton_as7712_32x_led_driver);
 	if (ret < 0) {
 		goto exit;
