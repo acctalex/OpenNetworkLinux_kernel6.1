@@ -103,6 +103,9 @@ class OnlPlatform_x86_64_accton_as7726_32x_r0(OnlPlatformAccton,
             ('ym2651', 0x58, 49),
          ])
 
+        # initialize pca9548 idle_state
+        subprocess.call('echo -2 | tee /sys/bus/i2c/drivers/pca954x/*-00*/idle_state > /dev/null', shell=True)
+
         # initialize QSFP port 1~8
         for port in range(1, 5):
             self.new_i2c_device('optoe1', 0x50, port+20)
