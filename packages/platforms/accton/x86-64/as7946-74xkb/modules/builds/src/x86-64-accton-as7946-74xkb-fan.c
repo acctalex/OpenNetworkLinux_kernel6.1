@@ -151,13 +151,13 @@ enum as7946_74xkb_fan_sysfs_attrs {
 
 #define DECLARE_FAN_SENSOR_DEVICE_ATTR(index) \
 	static SENSOR_DEVICE_ATTR(fan##index##_present, S_IRUGO, show_fan, NULL, \
-								FAN##index##_PRESENT); \
+						FAN##index##_PRESENT); \
 	static SENSOR_DEVICE_ATTR(fan##index##_pwm, S_IWUSR | S_IRUGO, show_fan, \
-								set_fan, FAN##index##_PWM); \
+						set_fan, FAN##index##_PWM); \
 	static SENSOR_DEVICE_ATTR(fan##index##_input, S_IRUGO, show_fan, NULL, \
-								FAN##index##_INPUT); \
+						FAN##index##_INPUT); \
 	static SENSOR_DEVICE_ATTR(fan##index##_dir, S_IRUGO, show_dir, NULL, \
-								FAN##index##_DIR)
+						FAN##index##_DIR)
 #define DECLARE_FAN_ATTR(index) \
 	&sensor_dev_attr_fan##index##_present.dev_attr.attr, \
 	&sensor_dev_attr_fan##index##_pwm.dev_attr.attr, \
@@ -379,47 +379,47 @@ static ssize_t show_fan(struct device *dev, struct device_attribute *da,
 	present = !!data->ipmi_resp[index + FAN_PRESENT];
 
 	switch (attr->index) {
-    case FAN1_PRESENT:
-    case FAN2_PRESENT:
-    case FAN3_PRESENT:
-    case FAN4_PRESENT:
-    case FAN5_PRESENT:
-    case FAN6_PRESENT:
-    case FAN7_PRESENT:
-    case FAN8_PRESENT:
-    case FAN9_PRESENT:
-    case FAN10_PRESENT:
-        value = present;
-        break;
-    case FAN1_PWM:
-    case FAN2_PWM:
-    case FAN3_PWM:
-    case FAN4_PWM:
-    case FAN5_PWM:
-    case FAN6_PWM:
-    case FAN7_PWM:
-    case FAN8_PWM:
-    case FAN9_PWM:
-    case FAN10_PWM:
-        index = (fid % NUM_OF_FAN_MODULE) * FAN_DATA_COUNT;
-        value = data->ipmi_resp[index + FAN_PWM] + 1;
-        break;
-    case FAN1_INPUT:
-    case FAN2_INPUT:
-    case FAN3_INPUT:
-    case FAN4_INPUT:
-    case FAN5_INPUT:
-    case FAN6_INPUT:
-    case FAN7_INPUT:
-    case FAN8_INPUT:
-    case FAN9_INPUT:
-    case FAN10_INPUT:
-        value = (int)data->ipmi_resp[index + FAN_SPEED0] |
-                (int)data->ipmi_resp[index + FAN_SPEED1] << 8;
-        break;
-    default:
-        error = -EINVAL;
-        goto exit;
+	case FAN1_PRESENT:
+	case FAN2_PRESENT:
+	case FAN3_PRESENT:
+	case FAN4_PRESENT:
+	case FAN5_PRESENT:
+	case FAN6_PRESENT:
+	case FAN7_PRESENT:
+	case FAN8_PRESENT:
+	case FAN9_PRESENT:
+	case FAN10_PRESENT:
+		value = present;
+		break;
+	case FAN1_PWM:
+	case FAN2_PWM:
+	case FAN3_PWM:
+	case FAN4_PWM:
+	case FAN5_PWM:
+	case FAN6_PWM:
+	case FAN7_PWM:
+	case FAN8_PWM:
+	case FAN9_PWM:
+	case FAN10_PWM:
+		index = (fid % NUM_OF_FAN_MODULE) * FAN_DATA_COUNT;
+		value = data->ipmi_resp[index + FAN_PWM] + 1;
+		break;
+	case FAN1_INPUT:
+	case FAN2_INPUT:
+	case FAN3_INPUT:
+	case FAN4_INPUT:
+	case FAN5_INPUT:
+	case FAN6_INPUT:
+	case FAN7_INPUT:
+	case FAN8_INPUT:
+	case FAN9_INPUT:
+	case FAN10_INPUT:
+		value = (int)data->ipmi_resp[index + FAN_SPEED0] |
+		        (int)data->ipmi_resp[index + FAN_SPEED1] << 8;
+		break;
+	default:
+		error = -EINVAL;
+		goto exit;
 	}
 
 	mutex_unlock(&data->update_lock);
@@ -451,8 +451,9 @@ static ssize_t set_fan(struct device *dev, struct device_attribute *da,
 	data->ipmi_tx_data[1] = 0x02;
 	data->ipmi_tx_data[2] = pwm;
 	status = ipmi_send_message(&data->ipmi, IPMI_FAN_WRITE_CMD,
-								data->ipmi_tx_data, sizeof(data->ipmi_tx_data),
-								NULL, 0);
+				data->ipmi_tx_data, sizeof(data->ipmi_tx_data),
+				NULL, 0);
+	
 	if (unlikely(status != 0))
 		goto exit;
 
@@ -477,9 +478,9 @@ static struct as7946_74xkb_fan_data *as7946_74xkb_fan_update_cpld_ver(void)
 	data->valid = 0;
 	data->ipmi_tx_data[0] = 0x68;
 	status = ipmi_send_message(&data->ipmi, IPMI_FAN_REG_READ_CMD,
-								data->ipmi_tx_data, 1,
-								data->ipmi_resp_cpld,
-								sizeof(data->ipmi_resp_cpld));
+						data->ipmi_tx_data, 1,
+						data->ipmi_resp_cpld,
+						sizeof(data->ipmi_resp_cpld));
 	if (unlikely(status != 0))
 		goto exit;
 
@@ -546,7 +547,7 @@ static ssize_t show_dir(struct device *dev, struct device_attribute *da,
 		return sprintf(buf, "0\n");
 	else
 		return sprintf(buf, "%s\n",
-						(value & BIT(fid % NUM_OF_FAN_MODULE)) ? "B2F" : "F2B");
+			(value & BIT(fid % NUM_OF_FAN_MODULE)) ? "B2F" : "F2B");
 
 exit:
 	mutex_unlock(&data->update_lock);
