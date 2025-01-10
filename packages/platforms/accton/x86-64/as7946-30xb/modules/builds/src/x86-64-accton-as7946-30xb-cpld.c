@@ -793,6 +793,26 @@ exit:
 	return status;
 }
 
+static umode_t as7946_30xb_cpld_is_visible(const void *drvdata,
+                  enum hwmon_sensor_types type,
+                  u32 attr, int channel)
+{
+	return 0;
+}
+
+static const struct hwmon_channel_info *as7946_30xb_cpld_info[] = {
+	HWMON_CHANNEL_INFO(chip, HWMON_C_REGISTER_TZ),
+	NULL,
+};
+
+static const struct hwmon_ops as7946_30xb_cpld_hwmon_ops = {
+	.is_visible = as7946_30xb_cpld_is_visible,
+};
+
+static const struct hwmon_chip_info as7946_30xb_cpld_chip_info = {
+	.ops = &as7946_30xb_cpld_hwmon_ops,
+	.info = as7946_30xb_cpld_info,
+};
 
 static int as7946_30xb_cpld_probe(struct i2c_client *client,
 			const struct i2c_device_id *dev_id)
@@ -823,7 +843,10 @@ static int as7946_30xb_cpld_probe(struct i2c_client *client,
 	if (status)
 		goto exit_free;
 
-	data->hwmon_dev = hwmon_device_register_with_info(&client->dev, DRVNAME, NULL, NULL, NULL);
+	data->hwmon_dev = hwmon_device_register_with_info(&client->dev, 
+					DRVNAME, NULL, 
+					&as7946_30xb_cpld_chip_info, NULL);
+
 	if (IS_ERR(data->hwmon_dev)) {
 		status = PTR_ERR(data->hwmon_dev);
 		goto exit_remove;
@@ -845,7 +868,7 @@ exit:
 	return status;
 }
 
-static int as7946_30xb_cpld_remove(struct i2c_client *client)
+static void as7946_30xb_cpld_remove(struct i2c_client *client)
 {
 	struct as7946_30xb_cpld_data *data = i2c_get_clientdata(client);
 
@@ -853,8 +876,6 @@ static int as7946_30xb_cpld_remove(struct i2c_client *client)
 	sysfs_remove_group(&client->dev.kobj, cpld_groups[data->index]);
 	kfree(data);
 	as7946_30xb_cpld_remove_client(client);
-
-	return 0;
 }
 
 static const struct i2c_device_id as7946_30xb_cpld_id[] = {
