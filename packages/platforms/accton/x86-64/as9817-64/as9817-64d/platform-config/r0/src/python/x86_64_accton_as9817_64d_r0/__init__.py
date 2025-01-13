@@ -97,6 +97,9 @@ class OnlPlatform_x86_64_accton_as9817_64d_r0(OnlPlatformAccton,
                 ]
             )
 
+        # initialize pca9548 idle_state
+        subprocess.call('echo -2 | tee /sys/bus/i2c/drivers/pca954x/*-00*/idle_state > /dev/null', shell=True)
+
         # initialize SFP devices
         for port in range(1, 65):
             subprocess.call('echo 0 > /sys/devices/platform/as9817_64_fpga/module_reset_%d' % (port), shell=True)
