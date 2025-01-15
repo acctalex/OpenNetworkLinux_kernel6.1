@@ -362,15 +362,13 @@ exit:
 	return status;
 }
 
-static int as7535_28xb_fpga_remove(struct i2c_client *client)
+static void as7535_28xb_fpga_remove(struct i2c_client *client)
 {
 	struct as7535_28xb_fpga_data *data = i2c_get_clientdata(client);
 
 	sysfs_remove_group(&client->dev.kobj, fpga_groups[data->index]);
 	kfree(data);
 	as7535_28xb_fpga_remove_client(client);
-
-	return 0;
 }
 
 static const struct i2c_device_id as7535_28xb_fpga_id[] = {

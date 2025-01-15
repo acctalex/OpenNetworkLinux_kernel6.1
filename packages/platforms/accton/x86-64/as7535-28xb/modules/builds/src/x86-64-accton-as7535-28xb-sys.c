@@ -37,6 +37,8 @@
 #define IPMI_TIMEOUT (5 * HZ)
 #define IPMI_ERR_RETRY_TIMES 1
 #define IPMI_READ_MAX_LEN 128
+#define IPMI_RESET_CMD		0x65
+#define IPMI_RESET_CMD_LENGTH	6
 
 #define EEPROM_NAME "eeprom"
 #define EEPROM_SIZE 256	/*	256 byte eeprom */
@@ -48,12 +50,16 @@ static void ipmi_msg_handler(struct ipmi_recv_msg *msg, void *user_msg_data);
 static int as7535_28xb_sys_probe(struct platform_device *pdev);
 static int as7535_28xb_sys_remove(struct platform_device *pdev);
 static ssize_t show_version(struct device *dev,
-								struct device_attribute *da, char *buf);
+			struct device_attribute *da, char *buf);
+static ssize_t get_reset(struct device *dev, struct device_attribute *da,
+			char *buf);
+static ssize_t set_reset(struct device *dev, struct device_attribute *da,
+			const char *buf, size_t count);
 
 struct ipmi_data {
 	struct completion read_complete;
 	struct ipmi_addr address;
-	ipmi_user_t user;
+	struct ipmi_user *user;
 	int interface;
 
 	struct kernel_ipmi_msg tx_message;
@@ -74,8 +80,10 @@ struct as7535_28xb_sys_data {
 	unsigned long last_updated;	/* In jiffies */
 	struct ipmi_data ipmi;
 	unsigned char ipmi_resp_eeprom[EEPROM_SIZE];
-	unsigned char ipmi_resp_cpld;
+	unsigned char ipmi_resp_cpld[2];
 	unsigned char ipmi_tx_data[2];
+	unsigned char ipmi_resp_rst[2];
+	unsigned char ipmi_tx_data_rst[IPMI_RESET_CMD_LENGTH];
 	struct bin_attribute eeprom; /* eeprom data */
 };
 
@@ -91,13 +99,41 @@ static struct platform_driver as7535_28xb_sys_driver = {
 };
 
 enum as7535_28xb_sys_sysfs_attrs {
+	RESET_MUX,
+	RESET_MAC,
 	FPGA_VER, /* FPGA version */
+	FPGA_MINOR_VER, /* FPGA minor version */
+	CPU_CPLD_VER, /* CPU CPLD version */
+	CPU_CPLD_MINOR_VER, /* CPU CPLD minor version */
 };
 
-static SENSOR_DEVICE_ATTR(fpga_version, S_IRUGO, show_version, NULL, FPGA_VER);
+static SENSOR_DEVICE_ATTR(fpga_version, S_IRUGO, show_version, NULL, \
+							FPGA_VER);
+static SENSOR_DEVICE_ATTR(fpga_minor_version, S_IRUGO, show_version, NULL, \
+							FPGA_MINOR_VER);
+static SENSOR_DEVICE_ATTR(cpu_cpld_version, S_IRUGO, show_version, NULL, \
+							CPU_CPLD_VER);
+static SENSOR_DEVICE_ATTR(cpu_cpld_minor_version, S_IRUGO, show_version, NULL, \
+							CPU_CPLD_MINOR_VER);
+
+#define DECLARE_RESET_SENSOR_DEVICE_ATTR() \
+	static SENSOR_DEVICE_ATTR(reset_mac, S_IWUSR | S_IRUGO, \
+				get_reset, set_reset, RESET_MAC); \
+	static SENSOR_DEVICE_ATTR(reset_mux, S_IWUSR | S_IRUGO, \
+				get_reset, set_reset, RESET_MUX)
+#define DECLARE_RESET_ATTR() \
+	&sensor_dev_attr_reset_mac.dev_attr.attr, \
+	&sensor_dev_attr_reset_mux.dev_attr.attr
+
+DECLARE_RESET_SENSOR_DEVICE_ATTR();
 
 static struct attribute *as7535_28xb_sys_attributes[] = {
+	/* sysfs attributes */
+	DECLARE_RESET_ATTR(),
 	&sensor_dev_attr_fpga_version.dev_attr.attr,
+	&sensor_dev_attr_fpga_minor_version.dev_attr.attr,
+	&sensor_dev_attr_cpu_cpld_version.dev_attr.attr,
+	&sensor_dev_attr_cpu_cpld_minor_version.dev_attr.attr,
 	NULL
 };
 
@@ -245,6 +281,71 @@ static void ipmi_msg_handler(struct ipmi_recv_msg *msg, void *user_msg_data)
 	complete(&ipmi->read_complete);
 }
 
+static ssize_t get_reset(struct device *dev, struct device_attribute *da,
+			char *buf)
+{
+	int status = 0;
+
+	mutex_lock(&data->update_lock);
+	status = ipmi_send_message(&data->ipmi, IPMI_RESET_CMD, NULL, 0,
+				   data->ipmi_resp_rst, sizeof(data->ipmi_resp_rst));
+	if (unlikely(status != 0))
+		goto exit;
+
+	if (unlikely(data->ipmi.rx_result != 0)) {
+		status = -EIO;
+		goto exit;
+	}
+
+	mutex_unlock(&data->update_lock);
+	return sprintf(buf, "0x%x 0x%x", data->ipmi_resp_rst[0], data->ipmi_resp_rst[1]);
+
+ exit:
+	mutex_unlock(&data->update_lock);
+	return status;
+}
+
+static ssize_t set_reset(struct device *dev, struct device_attribute *da,
+		       const char *buf, size_t count)
+{
+	u32 magic[2];
+	int status;
+	struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
+
+	if (sscanf(buf, "0x%x 0x%x", &magic[0], &magic[1]) != 2)
+		return -EINVAL;
+
+	if (magic[0] > 0xFF || magic[1] > 0xFF)
+		return -EINVAL;
+
+	mutex_lock(&data->update_lock);
+
+	/* Send IPMI write command */
+	data->ipmi_tx_data_rst[0] = 0;
+	data->ipmi_tx_data_rst[1] = 0;
+	data->ipmi_tx_data_rst[2] = (attr->index == RESET_MUX) ? 0 : (attr->index);
+	data->ipmi_tx_data_rst[3] = (attr->index == RESET_MUX) ? 2 : 1;
+	data->ipmi_tx_data_rst[4] = magic[0];
+	data->ipmi_tx_data_rst[5] = magic[1];
+
+	status = ipmi_send_message(&data->ipmi, IPMI_RESET_CMD,
+				   data->ipmi_tx_data_rst,
+				   sizeof(data->ipmi_tx_data_rst), NULL, 0);
+	if (unlikely(status != 0))
+		goto exit;
+
+	if (unlikely(data->ipmi.rx_result != 0)) {
+		status = -EIO;
+		goto exit;
+	}
+
+	status = count;
+
+ exit:
+	mutex_unlock(&data->update_lock);
+	return status;
+}
+
 static ssize_t sys_eeprom_read(loff_t off, char *buf, size_t count)
 {
 	int status = 0;
@@ -329,15 +430,17 @@ static int sysfs_eeprom_cleanup(struct kobject *kobj,
 	return 0;
 }
 
-static struct as7535_28xb_sys_data *as7535_28xb_sys_update_fpga_ver(void)
+static struct as7535_28xb_sys_data *as7535_28xb_sys_update_ver(
+				unsigned char reg)
 {
 	int status = 0;
 
 	data->valid = 0;
-	data->ipmi_tx_data[0] = 0x60;
+
+	data->ipmi_tx_data[0] = reg;
 	status = ipmi_send_message(&data->ipmi, IPMI_CPLD_READ_CMD,
 								data->ipmi_tx_data, 1,
-								&data->ipmi_resp_cpld,
+								data->ipmi_resp_cpld,
 								sizeof(data->ipmi_resp_cpld));
 	if (unlikely(status != 0))
 		goto exit;
@@ -357,18 +460,31 @@ exit:
 static ssize_t show_version(struct device *dev,
 								struct device_attribute *da, char *buf)
 {
+	struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
+	unsigned char reg;
 	unsigned char value = 0;
 	int error = 0;
 
 	mutex_lock(&data->update_lock);
 
-	data = as7535_28xb_sys_update_fpga_ver();
+	if ((attr->index == FPGA_VER) || (attr->index == FPGA_MINOR_VER))
+		reg = 0x60;
+	else if ((attr->index == CPU_CPLD_VER) || 
+			(attr->index == CPU_CPLD_MINOR_VER))
+		reg = 0x65;
+
+	data = as7535_28xb_sys_update_ver(reg);
+
 	if (!data->valid) {
 		error = -EIO;
 		goto exit;
 	}
 
-	value = data->ipmi_resp_cpld;
+	if ((attr->index == FPGA_VER) || (attr->index == CPU_CPLD_VER))
+		value = data->ipmi_resp_cpld[0];
+	else if (attr->index == FPGA_MINOR_VER || attr->index == CPU_CPLD_MINOR_VER)
+		value = data->ipmi_resp_cpld[1];
+
 	mutex_unlock(&data->update_lock);
 	return sprintf(buf, "%d\n", value);
 
