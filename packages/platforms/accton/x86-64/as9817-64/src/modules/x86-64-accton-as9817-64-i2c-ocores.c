@@ -795,8 +795,8 @@ static int ocores_i2c_probe(struct platform_device *pdev)
 
     init_waitqueue_head(&i2c->wait);
 
-    //irq = platform_get_irq_optional(pdev, 0);
-    irq = platform_get_irq(pdev, 0);
+    irq = platform_get_irq_optional(pdev, 0);
+    /*irq = platform_get_irq(pdev, 0);*/
     if (irq == -ENXIO) {
         ocores_algorithm.master_xfer = ocores_xfer_polling;
 
