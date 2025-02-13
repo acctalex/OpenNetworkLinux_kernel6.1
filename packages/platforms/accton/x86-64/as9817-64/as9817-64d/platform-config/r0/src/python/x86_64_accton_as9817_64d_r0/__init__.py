@@ -68,6 +68,11 @@ def init_ipmi():
     print('Failed to initialize IPMI dev interface')
     return False
 
+def get_i2c_bus_num_offset():
+    cmd = 'cat /sys/bus/i2c/devices/i2c-0/name'
+    process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = process.communicate()
+    return 1 if 'iSMT' in stdout else 0
 
 class OnlPlatform_x86_64_accton_as9817_64d_r0(OnlPlatformAccton,
                                               OnlPlatformPortConfig_64x800_2x25):
@@ -89,14 +94,16 @@ class OnlPlatform_x86_64_accton_as9817_64d_r0(OnlPlatformAccton,
         for m in [ 'i2c-ocores', 'fpga', 'mux', 'fan', 'psu', 'thermal', 'sys', 'leds' ]:
             self.insmod("x86-64-accton-as9817-64-%s" % m)
 
+        bus_offset = get_i2c_bus_num_offset()
+
         ########### initialize I2C bus 0 ###########
         self.new_i2c_devices(
             [
                 # initialize multiplexer (PCA9548)
-                ('as9817_64_mux', 0x78, 0),
+                ('as9817_64_mux', 0x78, 0+bus_offset),
 
                 # initiate IDPROM
-                ('24c02', 0x56, 67),
+                ('24c02', 0x56, 68),
                 ]
             )
 
@@ -105,11 +112,11 @@ class OnlPlatform_x86_64_accton_as9817_64d_r0(OnlPlatformAccton,
             subprocess.call('echo 0 > /sys/devices/platform/as9817_64_fpga/module_reset_%d' % (port), shell=True)
 
         sfp_bus = [
-             1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16,
-            17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
-            33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48,
-            49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64,
-            65, 66
+             2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17,
+            18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33,
+            34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
+            50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65,
+            66, 67
         ]
 
         for port in range(1, len(sfp_bus)+1):
