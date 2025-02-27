@@ -1,6 +1,12 @@
 from onl.platform.base import *
 from onl.platform.accton import *
 
+def get_i2c_bus_num_offset():
+    cmd = 'cat /sys/bus/i2c/devices/i2c-0/name'
+    process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = process.communicate()
+    return -1 if b'iSMT' in stdout else 0 # the iSMT adapter may get i2c bus 0, hence the offset -1
+
 class OnlPlatform_x86_64_accton_as4630_54pe_r0(OnlPlatformAccton,
                                               OnlPlatformPortConfig_48x1_4x25_2x100):
 
@@ -9,16 +15,17 @@ class OnlPlatform_x86_64_accton_as4630_54pe_r0(OnlPlatformAccton,
     SYS_OBJECT_ID=".4630.54"
 
     def baseconfig(self):
-        os.system("modprobe i2c-ismt")
         self.insmod('optoe')
         self.insmod('ym2651y')
 
         for m in [ 'cpld', 'psu', 'leds' ]:
             self.insmod("x86-64-accton-as4630-54pe-%s.ko" % m)
 
+        bus_offset = get_i2c_bus_num_offset()
+
         ########### initialize I2C bus 0 ###########
         # initialize multiplexer (PCA9548)        
-        self.new_i2c_device('pca9548', 0x77, 1)
+        self.new_i2c_device('pca9548', 0x77, 1+bus_offset)
         
         self.new_i2c_devices([
             # initialize multiplexer (PCA9548)                        
@@ -57,5 +64,5 @@ class OnlPlatform_x86_64_accton_as4630_54pe_r0(OnlPlatformAccton,
             self.new_i2c_device('optoe1', 0x50, port-31)
             subprocess.call('echo port%d > /sys/bus/i2c/devices/%d-0050/port_name' % (port, port-31), shell=True)
       
-        self.new_i2c_device('24c02', 0x57, 1)
+        self.new_i2c_device('24c02', 0x57, 1+bus_offset)
         return True
