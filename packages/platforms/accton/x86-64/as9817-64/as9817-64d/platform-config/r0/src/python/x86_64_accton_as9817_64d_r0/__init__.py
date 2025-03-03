@@ -72,7 +72,7 @@ def get_i2c_bus_num_offset():
     cmd = 'cat /sys/bus/i2c/devices/i2c-0/name'
     process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = process.communicate()
-    return 1 if 'iSMT' in stdout else 0
+    return 1 if b'iSMT' in stdout else 0
 
 class OnlPlatform_x86_64_accton_as9817_64d_r0(OnlPlatformAccton,
                                               OnlPlatformPortConfig_64x800_2x25):
