@@ -87,7 +87,7 @@ static struct as9926_24db_sfp_data *as9926_24db_qsfp_update_reset(void);
 struct ipmi_data {
 	struct completion   read_complete;
 	struct ipmi_addr    address;
-	ipmi_user_t         user;
+	struct ipmi_user    *user;
 	int                 interface;
 
 	struct kernel_ipmi_msg tx_message;
