@@ -10,10 +10,7 @@ class OnlPlatform_x86_64_accton_as9736_64d_r0(OnlPlatformAccton,
 
     def baseconfig(self):
         self.insmod('optoe')
-        #self.insmod('ym2651y')
         self.insmod('accton_i2c_psu')
-        #os.system('insmod /lib/modules/5.4.40-OpenNetworkLinux/kernel/drivers/i2c/busses/i2c-ismt.ko')
-        os.system("modprobe i2c-ismt")
 
         for m in [ 'sys', 'cpld', 'fan', 'psu', 'leds', 'fpga' ]:
             self.insmod("x86-64-accton-as9736-64d-%s.ko" % m)

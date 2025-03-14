@@ -15,7 +15,6 @@ class OnlPlatform_x86_64_accton_as4630_54te_r0(OnlPlatformAccton,
     SYS_OBJECT_ID=".4630.54.1"
 
     def baseconfig(self):
-        os.system("modprobe i2c-ismt")
         self.insmod('optoe')
         self.insmod('ym2651y')
         for m in [ 'cpld', 'psu', 'leds' ]:
