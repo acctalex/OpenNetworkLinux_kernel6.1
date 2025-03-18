@@ -53,7 +53,8 @@
 #define PSU1_AC_EEPROM_PREFIX "/sys/bus/i2c/devices/8-0050/"
 #define PSU2_AC_EEPROM_PREFIX "/sys/bus/i2c/devices/9-0051/"
 
-#define CPLD_NODE_PATH    "/sys/bus/i2c/devices/i2c-0/0-0064/"
+#define CPLD_NODE_PATH_0    "/sys/bus/i2c/devices/i2c-0/0-0064/"
+#define CPLD_NODE_PATH_1    "/sys/bus/i2c/devices/i2c-1/1-0064/"
 
 #define FAN_NODE_PATH     "/sys/devices/platform/as4625_fan/hwmon*"
 #define FAN_NODE(node)    FAN_NODE_PATH#node

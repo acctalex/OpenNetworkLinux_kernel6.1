@@ -98,9 +98,11 @@ _onlp_fani_info_get_fan(int fid, onlp_fan_info_t* info)
 
 	/* get fan direction (both : the same)
 	 */
-	if (onlp_file_read_int(&value, "%s""pcb_id", CPLD_NODE_PATH) < 0) {
-		AIM_LOG_ERROR("Unable to read fan direction from CPLD\r\n");
-		return ONLP_STATUS_E_INTERNAL;
+	if (onlp_file_read_int(&value, "%s""pcb_id", CPLD_NODE_PATH_0) < 0) {
+		if (onlp_file_read_int(&value, "%s""pcb_id", CPLD_NODE_PATH_1) < 0) {
+			AIM_LOG_ERROR("Unable to read fan direction from CPLD\r\n");
+			return ONLP_STATUS_E_INTERNAL;
+		}
 	}
 	info->status |= (value == 2) ? ONLP_FAN_STATUS_B2F : ONLP_FAN_STATUS_F2B;
 

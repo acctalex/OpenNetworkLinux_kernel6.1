@@ -76,8 +76,11 @@ enum onlp_fan_dir onlp_get_fan_dir(void)
 	int value = 0;
 	enum onlp_fan_dir dir = FAN_DIR_F2B;
 
-	if (onlp_file_read_int(&value, "%s""pcb_id", CPLD_NODE_PATH) < 0)
-		AIM_LOG_ERROR("Unable to read fan direction from CPLD\r\n");
+	if (onlp_file_read_int(&value, "%s""pcb_id", CPLD_NODE_PATH_0) < 0){
+		if (onlp_file_read_int(&value, "%s""pcb_id", CPLD_NODE_PATH_1) < 0){
+			AIM_LOG_ERROR("Unable to read fan direction from CPLD\r\n");
+		}
+	}
 
 	dir = (value == 2) ? FAN_DIR_B2F : FAN_DIR_F2B;
 

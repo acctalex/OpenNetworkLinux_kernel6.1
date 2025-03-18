@@ -30,12 +30,18 @@
 #include "x86_64_accton_as4625_54t_log.h"
 
 #define PORT_EEPROM_FORMAT      "/sys/bus/i2c/devices/%d-0050/eeprom"
-#define MODULE_PRESENT_FORMAT   "/sys/bus/i2c/devices/0-0064/module_present_%d"
-#define MODULE_RXLOS_FORMAT     "/sys/bus/i2c/devices/0-0064/module_rx_los_%d"
-#define MODULE_TXFAULT_FORMAT   "/sys/bus/i2c/devices/0-0064/module_tx_fault_%d"
-#define MODULE_TXDISABLE_FORMAT "/sys/bus/i2c/devices/0-0064/module_tx_disable_%d"
-#define MODULE_PRESENT_ALL_ATTR "/sys/bus/i2c/devices/0-0064/module_present_all"
-#define MODULE_RXLOS_ALL_ATTR   "/sys/bus/i2c/devices/0-0064/module_rx_los_all"
+#define MODULE_PRESENT_FORMAT_0   "/sys/bus/i2c/devices/0-0064/module_present_%d"
+#define MODULE_RXLOS_FORMAT_0     "/sys/bus/i2c/devices/0-0064/module_rx_los_%d"
+#define MODULE_TXFAULT_FORMAT_0   "/sys/bus/i2c/devices/0-0064/module_tx_fault_%d"
+#define MODULE_TXDISABLE_FORMAT_0 "/sys/bus/i2c/devices/0-0064/module_tx_disable_%d"
+#define MODULE_PRESENT_ALL_ATTR_0 "/sys/bus/i2c/devices/0-0064/module_present_all"
+#define MODULE_RXLOS_ALL_ATTR_0   "/sys/bus/i2c/devices/0-0064/module_rx_los_all"
+#define MODULE_PRESENT_FORMAT_1   "/sys/bus/i2c/devices/1-0064/module_present_%d"
+#define MODULE_RXLOS_FORMAT_1     "/sys/bus/i2c/devices/1-0064/module_rx_los_%d"
+#define MODULE_TXFAULT_FORMAT_1   "/sys/bus/i2c/devices/1-0064/module_tx_fault_%d"
+#define MODULE_TXDISABLE_FORMAT_1 "/sys/bus/i2c/devices/1-0064/module_tx_disable_%d"
+#define MODULE_PRESENT_ALL_ATTR_1 "/sys/bus/i2c/devices/1-0064/module_present_all"
+#define MODULE_RXLOS_ALL_ATTR_1   "/sys/bus/i2c/devices/1-0064/module_rx_los_all"
 /* QSFP device address of eeprom */
 #define PORT_EEPROM_DEVADDR             0x50
 /* QSFP tx disable offset */
@@ -89,10 +95,12 @@ onlp_sfpi_is_present(int port)
 	int present;
 	VALIDATE_SFP(port);
 
-	if (onlp_file_read_int(&present, MODULE_PRESENT_FORMAT, port+1) < 0) {
-		AIM_LOG_ERROR("Unable to read present status from port(%d)\r\n", 
-			port);
-		return ONLP_STATUS_E_INTERNAL;
+	if (onlp_file_read_int(&present, MODULE_PRESENT_FORMAT_0, port+1) < 0) {
+		if (onlp_file_read_int(&present, MODULE_PRESENT_FORMAT_1, port+1) < 0) {
+			AIM_LOG_ERROR("Unable to read present status from port(%d)\r\n", 
+				port);
+			return ONLP_STATUS_E_INTERNAL;
+		}
 	}
 
 	return present;
@@ -107,10 +115,13 @@ onlp_sfpi_presence_bitmap_get(onlp_sfp_bitmap_t* dst)
 	/* Read present status of port 48 ~ 53 */
 	int count  = 0;
 
-	fp = fopen(MODULE_PRESENT_ALL_ATTR, "r");
+	fp = fopen(MODULE_PRESENT_ALL_ATTR_0, "r");
 	if(fp == NULL) {
-		AIM_LOG_ERROR("Unable to open the module_present_all device file");
-		return ONLP_STATUS_E_INTERNAL;
+		fp = fopen(MODULE_PRESENT_ALL_ATTR_1, "r");
+		if(fp == NULL) {
+			AIM_LOG_ERROR("Unable to open the module_present_all device file");
+			return ONLP_STATUS_E_INTERNAL;
+		}
 	}
 
 	count = fscanf(fp, "%x", &byte);
@@ -155,10 +166,13 @@ onlp_sfpi_rx_los_bitmap_get(onlp_sfp_bitmap_t* dst)
 	/* Read present status of port 48 ~ 53 */
 	int count1 = 0;
 
-	fp = fopen(MODULE_RXLOS_ALL_ATTR, "r");
+	fp = fopen(MODULE_RXLOS_ALL_ATTR_0, "r");
 	if(fp == NULL) {
-		AIM_LOG_ERROR("Unable to open the module_rx_los_all device file");
-		return ONLP_STATUS_E_INTERNAL;
+		fp = fopen(MODULE_RXLOS_ALL_ATTR_1, "r");
+		if(fp == NULL){
+			AIM_LOG_ERROR("Unable to open the module_rx_los_all device file");
+			return ONLP_STATUS_E_INTERNAL;
+		}
 	}
 
 	count = fscanf(fp, "%x", &byte);
@@ -170,10 +184,13 @@ onlp_sfpi_rx_los_bitmap_get(onlp_sfp_bitmap_t* dst)
 		return ONLP_STATUS_E_INTERNAL;
 	}
 
-	fp1 = fopen(MODULE_PRESENT_ALL_ATTR, "r");
+	fp1 = fopen(MODULE_PRESENT_ALL_ATTR_0, "r");
 	if(fp1 == NULL) {
-		AIM_LOG_ERROR("Unable to open the module_present_all device file");
-		return ONLP_STATUS_E_INTERNAL;
+		fp1 = fopen(MODULE_PRESENT_ALL_ATTR_1, "r");
+		if(fp1 == NULL) {
+			AIM_LOG_ERROR("Unable to open the module_present_all device file");
+			return ONLP_STATUS_E_INTERNAL;
+		}
 	}
 
 	count1 = fscanf(fp1, "%x", &byte1);
@@ -270,11 +287,14 @@ onlp_sfpi_control_set(int port, onlp_sfp_control_t control, int value)
 	switch(control) {
 	case ONLP_SFP_CONTROL_TX_DISABLE:{
 		if (port >= 48 && port <= 53) {
-			if (onlp_file_write_int(value, MODULE_TXDISABLE_FORMAT
+			if (onlp_file_write_int(value, MODULE_TXDISABLE_FORMAT_0
 				, (port+1)) < 0) {
-				AIM_LOG_ERROR("Unable to set tx_disable status to port(%d)\r\n"
+				if (onlp_file_write_int(value, MODULE_TXDISABLE_FORMAT_1
+					, (port+1)) < 0) {
+					AIM_LOG_ERROR("Unable to set tx_disable status to port(%d)\r\n"
 					, port);
-				return ONLP_STATUS_E_INTERNAL;
+					return ONLP_STATUS_E_INTERNAL;
+				}
 			}
 
 			return ONLP_STATUS_OK;
@@ -299,11 +319,14 @@ onlp_sfpi_control_get(int port, onlp_sfp_control_t control, int* value)
 	switch(control) {
 	case ONLP_SFP_CONTROL_RX_LOS: {
 		VALIDATE_SFP(port);
-		if (onlp_file_read_int(value, MODULE_RXLOS_FORMAT, (port+1)) 
+		if (onlp_file_read_int(value, MODULE_RXLOS_FORMAT_0, (port+1)) 
 			< 0) {
-			AIM_LOG_ERROR("Unable to read rx_loss status from port(%d)\r\n"
-				, port);
-			return ONLP_STATUS_E_INTERNAL;
+			if (onlp_file_read_int(value, MODULE_RXLOS_FORMAT_1, (port+1)) 
+				< 0) {
+				AIM_LOG_ERROR("Unable to read rx_loss status from port(%d)\r\n"
+					, port);
+				return ONLP_STATUS_E_INTERNAL;
+			}
 		}
 
 		return ONLP_STATUS_OK;
@@ -311,11 +334,14 @@ onlp_sfpi_control_get(int port, onlp_sfp_control_t control, int* value)
 
 	case ONLP_SFP_CONTROL_TX_FAULT: {
 		VALIDATE_SFP(port);
-		if (onlp_file_read_int(value, MODULE_TXFAULT_FORMAT, (port+1))
+		if (onlp_file_read_int(value, MODULE_TXFAULT_FORMAT_0, (port+1))
 			 < 0) {
-			AIM_LOG_ERROR("Unable to read tx_fault status from port(%d)\r\n"
-				, port);
-			return ONLP_STATUS_E_INTERNAL;
+			if (onlp_file_read_int(value, MODULE_TXFAULT_FORMAT_1, (port+1))
+			 	< 0) {
+				AIM_LOG_ERROR("Unable to read tx_fault status from port(%d)\r\n"
+					, port);
+				return ONLP_STATUS_E_INTERNAL;
+			}
 		}
 
 		return ONLP_STATUS_OK;
@@ -324,11 +350,14 @@ onlp_sfpi_control_get(int port, onlp_sfp_control_t control, int* value)
 	case ONLP_SFP_CONTROL_TX_DISABLE: {
 		if (port >= 48 && port <= 53)
 		{
-			if (onlp_file_read_int(value, MODULE_TXDISABLE_FORMAT, 
+			if (onlp_file_read_int(value, MODULE_TXDISABLE_FORMAT_0, 
 				(port+1)) < 0) {
-				AIM_LOG_ERROR("Unable to read tx_disabled status from port(%d)\r\n"
-					, port);
-				return ONLP_STATUS_E_INTERNAL;
+				if (onlp_file_read_int(value, MODULE_TXDISABLE_FORMAT_1, 
+					(port+1)) < 0) {
+					AIM_LOG_ERROR("Unable to read tx_disabled status from port(%d)\r\n"
+						, port);
+					return ONLP_STATUS_E_INTERNAL;
+				}
 			}
 
 			return ONLP_STATUS_OK;
