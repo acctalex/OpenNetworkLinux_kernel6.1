@@ -29,6 +29,8 @@
 
 #define WARM_RESET_FORMAT "/sys/devices/platform/as7535_28xb_sys/reset_%s"
 
+#define PSU_MODEL_NAME_LEN 10
+
 enum onlp_fan_dir onlp_get_fan_dir(int fid)
 {
     int len = 0;
@@ -116,4 +118,46 @@ int onlp_data_path_reset(uint8_t unit_id, uint8_t reset_dev)
 
     AIM_FREE_IF_PTR(magic_num);
     return ret;
+}
+
+psu_type_t get_psu_type(int tid, int psu_tid_start, char* modelname, int modelname_len)
+{
+    int ret = 0;
+    int pid = 0;
+    char *node = NULL;
+    char *mn   = NULL;
+
+    pid = (tid - psu_tid_start) < NUM_OF_THERMAL_PER_PSU ? PSU1_ID : PSU2_ID;
+
+    /* Check model name */
+    node = (pid == PSU1_ID) ? PSU_SYSFS_NODE(psu1_model) : PSU_SYSFS_NODE(psu2_model);
+
+    ret = onlp_file_read_str(&mn, node);
+
+    if (ret <= 0 || ret > PSU_MODEL_NAME_LEN || mn == NULL) {
+        AIM_FREE_IF_PTR(mn);
+        return PSU_TYPE_UNKNOWN;
+    }
+
+    if (!strncmp(mn, "PS-2601-6R", strlen("PS-2601-6R"))) {
+        if (modelname)
+            aim_strlcpy(modelname, mn, strlen(mn) <
+                (modelname_len-1) ? (strlen(mn)+1) :
+                (modelname_len-1));
+        AIM_FREE_IF_PTR(mn);
+
+        return PSU_TYPE_PS_2601_6R;
+    }
+
+    if (!strncmp(mn, "DD-2601-6R", strlen("DD-2601-6R"))) {
+        if (modelname)
+            aim_strlcpy(modelname, mn, strlen(mn) <
+                (modelname_len-1) ? (strlen(mn)+1) :
+                (modelname_len-1));
+        AIM_FREE_IF_PTR(mn);
+        return PSU_TYPE_DD_2601_6R;
+    }
+
+    AIM_FREE_IF_PTR(mn);
+    return PSU_TYPE_UNKNOWN;
 }
