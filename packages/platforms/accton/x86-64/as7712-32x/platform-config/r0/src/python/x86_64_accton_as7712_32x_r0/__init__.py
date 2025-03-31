@@ -1,6 +1,12 @@
 from onl.platform.base import *
 from onl.platform.accton import *
 
+def get_i2c_bus_num_offset():
+    cmd = 'cat /sys/bus/i2c/devices/i2c-0/name'
+    process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = process.communicate()
+    return 1 if b'iSMT' in stdout else 0
+
 class OnlPlatform_x86_64_accton_as7712_32x_r0(OnlPlatformAccton,
                                               OnlPlatformPortConfig_32x100):
     PLATFORM='x86-64-accton-as7712-32x-r0'
@@ -8,17 +14,18 @@ class OnlPlatform_x86_64_accton_as7712_32x_r0(OnlPlatformAccton,
     SYS_OBJECT_ID=".7712.32"
 
     def baseconfig(self):
-        os.system("modprobe i2c-ismt")
         self.insmod('optoe')
         self.insmod('ym2651y')
         for m in [ 'fan', 'cpld1', 'psu', 'leds' ]:
             self.insmod("x86-64-accton-as7712-32x-%s.ko" % m)
 
+        bus_offset = get_i2c_bus_num_offset()
+
         ########### initialize I2C bus 0 ###########
         self.new_i2c_devices([
 
             # initialize multiplexer (PCA9548)
-            ('pca9548', 0x76, 0),
+            ('pca9548', 0x76, 0+bus_offset),
 
             # initiate chassis fan
             ('as7712_32x_fan', 0x66, 2),
@@ -36,7 +43,7 @@ class OnlPlatform_x86_64_accton_as7712_32x_r0(OnlPlatformAccton,
         self.new_i2c_devices(
             [
                 # initiate multiplexer (PCA9548)
-                ('pca9548', 0x71, 1),
+                ('pca9548', 0x71, 1-bus_offset),
 
                 # initiate PSU-1
                 ('as7712_32x_psu1', 0x53, 11),
@@ -47,10 +54,10 @@ class OnlPlatform_x86_64_accton_as7712_32x_r0(OnlPlatformAccton,
                 ('ym2651', 0x58, 10),
 
                 # initiate multiplexer (PCA9548)
-                ('pca9548', 0x72, 1),
-                ('pca9548', 0x73, 1),
-                ('pca9548', 0x74, 1),
-                ('pca9548', 0x75, 1),
+                ('pca9548', 0x72, 1-bus_offset),
+                ('pca9548', 0x73, 1-bus_offset),
+                ('pca9548', 0x74, 1-bus_offset),
+                ('pca9548', 0x75, 1-bus_offset),
                 ]
             )
 
@@ -126,5 +133,5 @@ class OnlPlatform_x86_64_accton_as7712_32x_r0(OnlPlatformAccton,
         subprocess.call('echo port23 > /sys/bus/i2c/devices/48-0050/port_name', shell=True)
         subprocess.call('echo port24 > /sys/bus/i2c/devices/49-0050/port_name', shell=True)
 
-        self.new_i2c_device('24c02', 0x57, 1)
+        self.new_i2c_device('24c02', 0x57, 1-bus_offset)
         return True
