@@ -357,7 +357,13 @@ onlp_thermali_info_get(onlp_oid_t id, onlp_thermal_info_t* info)
     *info = linfo[local_id];
 
     if ((local_id >= THERMAL_1_ON_PSU1) && (local_id <= THERMAL_3_ON_PSU2)) {
-        onlp_thermali_psu_threshold_get(id, info);
+        if ( onlp_thermali_psu_threshold_get(id, info) == ONLP_STATUS_E_UNSUPPORTED) {
+            /* for display all PSU information that includes the fan and temperature, even access hardware fail.
+             */
+            info->status |= ONLP_THERMAL_STATUS_FAILED;
+            info->mcelsius = 0;
+            return ONLP_STATUS_OK;
+        }
     }
 
     if (local_id == THERMAL_CPU_CORE) {

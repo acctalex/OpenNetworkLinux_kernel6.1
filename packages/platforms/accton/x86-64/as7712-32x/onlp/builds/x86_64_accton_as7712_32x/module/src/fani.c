@@ -133,37 +133,28 @@ onlp_fan_info_t linfo[] = {
         return ONLP_STATUS_E_INTERNAL
 
 static uint32_t
-_onlp_fani_info_get_psu_fan_direction(void)
+_onlp_fani_info_get_psu_fan_direction(int local_id)
 {
-    /* Try to read direction from PSU1.
-     * If PSU1 is not valid, read from PSU2
-     */
-    int i = 0;
+    psu_type_t psu_type;
 
-    for (i = PSU1_ID; i <= PSU2_ID; i++) {
-        psu_type_t psu_type;
-        psu_type = get_psu_type(i, NULL, 0);
+    local_id = local_id - FAN_6_ON_MAIN_BOARD; /* transfer id to PSU 1 or 2*/
+    psu_type = get_psu_type(local_id, NULL, 0);
 
-        if (psu_type == PSU_TYPE_UNKNOWN) {
-            continue;
-        }
+    switch (psu_type) {
+        case PSU_TYPE_AC_YM2651Y_F2B:
+        case PSU_TYPE_AC_FSF019_610G_F2B:
+        case PSU_TYPE_AC_FSF019_612G_F2B:
+        case PSU_TYPE_DC48_YM2651V_F2B:
+        case PSU_TYPE_DC_12V_F2B:
+            return ONLP_FAN_STATUS_F2B;
+        case PSU_TYPE_AC_YM2651Y_B2F:
+        case PSU_TYPE_DC48_YM2651V_B2F:
+        case PSU_TYPE_DC_12V_B2F:
+            return ONLP_FAN_STATUS_B2F;
+        default:
+            return 0;
 
-		switch (psu_type) {
-			case PSU_TYPE_AC_YM2651Y_F2B:
-            case PSU_TYPE_AC_FSF019_610G_F2B:
-            case PSU_TYPE_AC_FSF019_612G_F2B:
-			case PSU_TYPE_DC48_YM2651V_F2B:
-			case PSU_TYPE_DC_12V_F2B:
-				return ONLP_FAN_STATUS_F2B;
-			case PSU_TYPE_AC_YM2651Y_B2F:
-			case PSU_TYPE_DC48_YM2651V_B2F:
-			case PSU_TYPE_DC_12V_B2F:
-				return ONLP_FAN_STATUS_B2F;
-			default:
-				return 0;
-		};
     }
-
     return 0;
 }
 
@@ -223,28 +214,43 @@ _onlp_fani_info_get_fan(int local_id, onlp_fan_info_t* info)
 static int
 _onlp_fani_info_get_fan_on_psu(int local_id, onlp_fan_info_t* info)
 {
-    int   fd, len, nbytes = 10;
+    int   fd, len, nbytes = 10, ret = 0;
     char  r_data[10]   = {0};
     char  fullpath[PATH_MAX] = {0};
 
     /* get fan direction
      */
-    info->status |= _onlp_fani_info_get_psu_fan_direction();
+    ret = _onlp_fani_info_get_psu_fan_direction(local_id);
 
-    /* get fan fault status
-     */
-    sprintf(fullpath, "%s%s", PREFIX_PATH_ON_PSU, fan_path[local_id].status);
-    OPEN_READ_FILE(fd,fullpath,r_data,nbytes,len);
-    info->status |= (atoi(r_data) > 0) ? ONLP_FAN_STATUS_FAILED : 0;
+    if (ret != 0)
+    {
+        info->status |= ret;
 
-    /* get fan speed
-     */
-    sprintf(fullpath, "%s%s", PREFIX_PATH_ON_PSU, fan_path[local_id].speed);
-    OPEN_READ_FILE(fd,fullpath,r_data,nbytes,len);
-    info->rpm = atoi(r_data);
+        /* get fan fault status
+         */
+        sprintf(fullpath, "%s%s", PREFIX_PATH_ON_PSU, fan_path[local_id].status);
+        OPEN_READ_FILE(fd,fullpath,r_data,nbytes,len);
+        info->status |= (atoi(r_data) > 0) ? ONLP_FAN_STATUS_FAILED : 0;
 
-    /* get speed percentage from rpm */
-    info->percentage = (info->rpm * 100) / MAX_PSU_FAN_SPEED;
+        /* get fan speed
+         */
+        sprintf(fullpath, "%s%s", PREFIX_PATH_ON_PSU, fan_path[local_id].speed);
+        OPEN_READ_FILE(fd,fullpath,r_data,nbytes,len);
+        info->rpm = atoi(r_data);
+
+        /* get speed percentage from rpm */
+        info->percentage = (info->rpm * 100) / MAX_PSU_FAN_SPEED;
+    }
+    else
+    {
+         /* Assume unsupported PSU model on the device is as failed.
+          * We don't know this unknown PSU model supports PMbus spec or not, so do not update other data.
+          */
+         info->rpm = 0;
+         info->percentage = 0;
+         info->status |= ONLP_FAN_STATUS_FAILED;
+    }
+
     info->status |= ONLP_FAN_STATUS_PRESENT;
 
     return ONLP_STATUS_OK;
@@ -271,7 +277,7 @@ onlp_fani_info_get(onlp_oid_t id, onlp_fan_info_t* info)
 
     switch (local_id)
     {
-	    case FAN_1_ON_PSU1:
+        case FAN_1_ON_PSU1:
         case FAN_1_ON_PSU2:
             rc = _onlp_fani_info_get_fan_on_psu(local_id, info);
             break;
