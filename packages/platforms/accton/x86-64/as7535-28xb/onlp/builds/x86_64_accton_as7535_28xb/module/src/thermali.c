@@ -26,6 +26,12 @@
 #include <onlplib/file.h>
 #include <onlp/platformi/thermali.h>
 #include "platform_lib.h"
+#include <dirent.h>
+#include <regex.h>
+
+#define CPU_CORETEMP_DIR_PATH "/sys/devices/platform/coretemp.0/hwmon"
+#define MAX_ENTRIES 128  /* Maximum number of temp*_input files */
+#define MAX_NAME_LEN 256 /* Maximum file name length */
 
 #define VALIDATE(_id)                           \
     do {                                        \
@@ -70,49 +76,57 @@ static char* devfiles_r02__[] = { /* must map with onlp_thermal_id */
     "/sys/devices/platform/as7535_28xb_psu/psu2_temp3_input",
 };
 
+typedef struct {
+    char name[MAX_NAME_LEN];
+    int index;
+} TempEntry;
 
-static char* cpu_coretemp_files[] = {
-    "/sys/devices/platform/coretemp.0*temp2_input",
-    "/sys/devices/platform/coretemp.0*temp3_input",
-    "/sys/devices/platform/coretemp.0*temp4_input",
-    "/sys/devices/platform/coretemp.0*temp5_input",
-    "/sys/devices/platform/coretemp.0*temp6_input",
-    "/sys/devices/platform/coretemp.0*temp7_input",
-    "/sys/devices/platform/coretemp.0*temp8_input",
-    "/sys/devices/platform/coretemp.0*temp9_input",
-    NULL,
-};
+
+TempEntry temp_entries[MAX_ENTRIES];
+/* Global regex variables */
+regex_t dir_regex, file_regex;
+int sysfs_count = 0;
+/* Function to safely concatenate paths and handle overflow */
+int safe_snprintf(char *buffer, size_t buffer_size, const char *path1, const char *path2) {
+    size_t needed_size = strlen(path1) + strlen(path2) + 2; /* 1 for '/', 1 for '\0' */
+    if (needed_size > buffer_size) {
+        AIM_LOG_ERROR("Path too long: %s/%s\n", path1, path2);
+        return -1;
+    }
+    snprintf(buffer, buffer_size, "%s/%s", path1, path2);
+    return 0;
+}
 
 /* Static values */
 static onlp_thermal_info_t tinfo[] = {
     { }, /* Not used */
     {   { ONLP_THERMAL_ID_CREATE(THERMAL_CPU_CORE), "CPU Core", 0, {0} },
         ONLP_THERMAL_STATUS_PRESENT,
-        ONLP_THERMAL_CAPS_ALL, 0, ONLP_THERMAL_THRESHOLD_INIT_DEFAULTS
+        ONLP_THERMAL_CAPS_ALL, 0, {94000, 100000, 103000}
     },
     {   { ONLP_THERMAL_ID_CREATE(THERMAL_1_ON_MAIN_BROAD), "LM75-4B", 0, {0} },
         ONLP_THERMAL_STATUS_PRESENT,
-        ONLP_THERMAL_CAPS_ALL, 0, ONLP_THERMAL_THRESHOLD_INIT_DEFAULTS
+        ONLP_THERMAL_CAPS_ALL, 0, {74000, 79000, 84000}
     },
     {   { ONLP_THERMAL_ID_CREATE(THERMAL_2_ON_MAIN_BROAD), "TMP431_0x4C_U50", 0, {0} },
         ONLP_THERMAL_STATUS_PRESENT,
-        ONLP_THERMAL_CAPS_ALL, 0, ONLP_THERMAL_THRESHOLD_INIT_DEFAULTS
+        ONLP_THERMAL_CAPS_ALL, 0, {84000, 89000, 94000}
     },
     {   { ONLP_THERMAL_ID_CREATE(THERMAL_3_ON_MAIN_BROAD), "TMP431_0x4C_MAC", 0, {0} },
         ONLP_THERMAL_STATUS_PRESENT,
-        ONLP_THERMAL_CAPS_ALL, 0, ONLP_THERMAL_THRESHOLD_INIT_DEFAULTS
+        ONLP_THERMAL_CAPS_ALL, 0, {97000, 102000, 107000}
     },
     {   { ONLP_THERMAL_ID_CREATE(THERMAL_4_ON_MAIN_BROAD), "LM75-4D", 0, {0} },
         ONLP_THERMAL_STATUS_PRESENT,
-        ONLP_THERMAL_CAPS_ALL, 0, ONLP_THERMAL_THRESHOLD_INIT_DEFAULTS
+        ONLP_THERMAL_CAPS_ALL, 0, {87000, 92000, 97000}
     },
     {   { ONLP_THERMAL_ID_CREATE(THERMAL_5_ON_MAIN_BROAD), "LM75-4E", 0, {0} },
         ONLP_THERMAL_STATUS_PRESENT,
-        ONLP_THERMAL_CAPS_ALL, 0, ONLP_THERMAL_THRESHOLD_INIT_DEFAULTS
+        ONLP_THERMAL_CAPS_ALL, 0, {80000, 85000, 90000}
     },
     {   { ONLP_THERMAL_ID_CREATE(THERMAL_6_ON_MAIN_BROAD), "LM75-4F", 0, {0} },
         ONLP_THERMAL_STATUS_PRESENT,
-        ONLP_THERMAL_CAPS_ALL, 0, ONLP_THERMAL_THRESHOLD_INIT_DEFAULTS
+        ONLP_THERMAL_CAPS_ALL, 0, {80000, 85000, 90000}
     },
     {   { ONLP_THERMAL_ID_CREATE(THERMAL_1_ON_PSU1), "PSU-1 Thermal Sensor 1", ONLP_PSU_ID_CREATE(PSU1_ID), {0} },
         ONLP_THERMAL_STATUS_PRESENT,
@@ -145,39 +159,39 @@ static onlp_thermal_info_t tinfo_r02[] = {
     { }, /* Not used */
     {   { ONLP_THERMAL_ID_CREATE(THERMAL_CPU_CORE), "CPU Core", 0, {0} },
         ONLP_THERMAL_STATUS_PRESENT,
-        ONLP_THERMAL_CAPS_ALL, 0, ONLP_THERMAL_THRESHOLD_INIT_DEFAULTS
+        ONLP_THERMAL_CAPS_ALL, 0, {94000, 100000, 103000}
     },
     {   { ONLP_THERMAL_ID_CREATE(THERMAL_1_ON_MAIN_BROAD), "LM75-4B", 0, {0} },
         ONLP_THERMAL_STATUS_PRESENT,
-        ONLP_THERMAL_CAPS_ALL, 0, ONLP_THERMAL_THRESHOLD_INIT_DEFAULTS
+        ONLP_THERMAL_CAPS_ALL, 0, {74000, 79000, 84000}
     },
     {   { ONLP_THERMAL_ID_CREATE(THERMAL_2_ON_MAIN_BROAD), "TMP431_0x4C_U50", 0, {0} },
         ONLP_THERMAL_STATUS_PRESENT,
-        ONLP_THERMAL_CAPS_ALL, 0, ONLP_THERMAL_THRESHOLD_INIT_DEFAULTS
+        ONLP_THERMAL_CAPS_ALL, 0, {84000, 89000, 94000}
     },
     {   { ONLP_THERMAL_ID_CREATE(THERMAL_3_ON_MAIN_BROAD), "TMP431_0x4C_MAC", 0, {0} },
         ONLP_THERMAL_STATUS_PRESENT,
-        ONLP_THERMAL_CAPS_ALL, 0, ONLP_THERMAL_THRESHOLD_INIT_DEFAULTS
+        ONLP_THERMAL_CAPS_ALL, 0, {97000, 102000, 107000}
     },
     {   { ONLP_THERMAL_ID_CREATE(THERMAL_4_ON_MAIN_BROAD), "LM75-4D", 0, {0} },
         ONLP_THERMAL_STATUS_PRESENT,
-        ONLP_THERMAL_CAPS_ALL, 0, ONLP_THERMAL_THRESHOLD_INIT_DEFAULTS
+        ONLP_THERMAL_CAPS_ALL, 0, {87000, 92000, 97000}
     },
     {   { ONLP_THERMAL_ID_CREATE(THERMAL_5_ON_MAIN_BROAD), "LM75-4E", 0, {0} },
         ONLP_THERMAL_STATUS_PRESENT,
-        ONLP_THERMAL_CAPS_ALL, 0, ONLP_THERMAL_THRESHOLD_INIT_DEFAULTS
+        ONLP_THERMAL_CAPS_ALL, 0, {80000, 85000, 90000}
     },
     {   { ONLP_THERMAL_ID_CREATE(THERMAL_6_ON_MAIN_BROAD), "LM75-4F", 0, {0} },
         ONLP_THERMAL_STATUS_PRESENT,
-        ONLP_THERMAL_CAPS_ALL, 0, ONLP_THERMAL_THRESHOLD_INIT_DEFAULTS
+        ONLP_THERMAL_CAPS_ALL, 0, {80000, 85000, 90000}
     },
     {   { ONLP_THERMAL_ID_CREATE(THERMAL_7_ON_MAIN_BROAD), "TMP431_0x4C_U93", 0, {0} },
         ONLP_THERMAL_STATUS_PRESENT,
-        ONLP_THERMAL_CAPS_ALL, 0, ONLP_THERMAL_THRESHOLD_INIT_DEFAULTS
+        ONLP_THERMAL_CAPS_ALL, 0, {82000, 87000, 92000}
     },
     {   { ONLP_THERMAL_ID_CREATE(THERMAL_8_ON_MAIN_BROAD), "TMP431_0x4C_C10", 0, {0} },
         ONLP_THERMAL_STATUS_PRESENT,
-        ONLP_THERMAL_CAPS_ALL, 0, ONLP_THERMAL_THRESHOLD_INIT_DEFAULTS
+        ONLP_THERMAL_CAPS_ALL, 0, {102000, 107000, 112000}
     },
     {   { ONLP_THERMAL_ID_CREATE(THERMAL_1_ON_PSU1), "PSU-1 Thermal Sensor 1", ONLP_PSU_ID_CREATE(PSU1_ID), {0} },
         ONLP_THERMAL_STATUS_PRESENT,
@@ -205,12 +219,123 @@ static onlp_thermal_info_t tinfo_r02[] = {
     }
 };
 
+
+int initialize_regex() {
+    if (regcomp(&dir_regex, "^hwmon[0-9]+$", REG_EXTENDED) != 0) {
+        AIM_LOG_ERROR("Failed to compile directory regex\n");
+        return -1;
+    }
+    if (regcomp(&file_regex, "^temp([0-9]+)_input$", REG_EXTENDED) != 0) {
+        AIM_LOG_ERROR("Failed to compile file regex\n");
+        regfree(&dir_regex);
+        return -1;
+    }
+    return 0;
+}
+
+void cleanup_regex() {
+    regfree(&dir_regex);
+    regfree(&file_regex);
+}
+
+/* Function to scan hwmon directories for temp*_input files */
+void scan_hwmon_files(const char *parent_path) {
+    DIR *parent_dir = opendir(parent_path);
+    if (!parent_dir) {
+        AIM_LOG_ERROR("Failed to open parent directory");
+        return;
+    }
+
+    size_t count = 0;
+
+    struct dirent *entry;
+    while ((entry = readdir(parent_dir)) != NULL) {
+        if (regexec(&dir_regex, entry->d_name, 0, NULL, 0) != 0) {
+            continue;
+        }
+
+        char subdir_path[MAX_NAME_LEN];
+        if (safe_snprintf(subdir_path, sizeof(subdir_path), parent_path, entry->d_name) < 0) {
+            continue;
+        }
+
+        DIR *subdir = opendir(subdir_path);
+        if (!subdir) {
+            AIM_LOG_ERROR("Failed to open subdirectory");
+            continue;
+        }
+
+        struct dirent *sub_entry;
+        while ((sub_entry = readdir(subdir)) != NULL) {
+            regmatch_t pmatch[2];
+            if (regexec(&file_regex, sub_entry->d_name, 2, pmatch, 0) == 0) {
+                if (count >= MAX_ENTRIES) {
+                    AIM_LOG_ERROR("Maximum entries reached. Ignoring additional files.\n");
+                    break;
+                }
+
+                char full_path[MAX_NAME_LEN];
+                if (safe_snprintf(full_path, sizeof(full_path), subdir_path, sub_entry->d_name) < 0) {
+                    continue;
+                }
+
+                int index = atoi(&sub_entry->d_name[pmatch[1].rm_so]);
+                strncpy(temp_entries[count].name, full_path, MAX_NAME_LEN - 1);
+                temp_entries[count].name[MAX_NAME_LEN - 1] = '\0';
+                temp_entries[count].index = index;
+                count++;
+            }
+        }
+        closedir(subdir);
+    }
+
+    closedir(parent_dir);
+
+    sysfs_count = count;
+}
+
+typedef struct threshold_t {
+	int warning;
+	int error;
+	int shutdown;
+} threshold_t;
+
+threshold_t threshold[CHASSIS_PSU_COUNT][NUM_OF_THERMAL_PER_PSU] = {
+    [PSU_TYPE_PS_2601_6R][0].warning  = 85000,
+    [PSU_TYPE_PS_2601_6R][0].error    = 90000,
+    [PSU_TYPE_PS_2601_6R][0].shutdown = 95000,
+    [PSU_TYPE_PS_2601_6R][1].warning  = 110000,
+    [PSU_TYPE_PS_2601_6R][1].error    = 115000,
+    [PSU_TYPE_PS_2601_6R][1].shutdown = 120000,
+    [PSU_TYPE_PS_2601_6R][2].warning  = 95000,
+    [PSU_TYPE_PS_2601_6R][2].error    = 100000,
+    [PSU_TYPE_PS_2601_6R][2].shutdown = 105000,
+
+    [PSU_TYPE_DD_2601_6R][0].warning  = 80000,
+    [PSU_TYPE_DD_2601_6R][0].error    = 103000,
+    [PSU_TYPE_DD_2601_6R][0].shutdown = 105000,
+    [PSU_TYPE_DD_2601_6R][1].warning  = 82500,
+    [PSU_TYPE_DD_2601_6R][1].error    = 105500,
+    [PSU_TYPE_DD_2601_6R][1].shutdown = 107500,
+    [PSU_TYPE_DD_2601_6R][2].warning  = 85000,
+    [PSU_TYPE_DD_2601_6R][2].error    = 108000,
+    [PSU_TYPE_DD_2601_6R][2].shutdown = 110000,
+};
+
 /*
  * This will be called to intiialize the thermali subsystem.
  */
 int
 onlp_thermali_init(void)
 {
+    /* Initialize regex patterns */
+    if (initialize_regex() != 0) {
+        return ONLP_STATUS_E_INTERNAL;
+    }
+    scan_hwmon_files(CPU_CORETEMP_DIR_PATH);
+    /* Clean up regex patterns */
+    cleanup_regex();
+
     return ONLP_STATUS_OK;
 }
 
@@ -230,17 +355,53 @@ onlp_thermali_info_get(onlp_oid_t id, onlp_thermal_info_t* info)
     int tid;
     VALIDATE(id);
     int pcb_id = 0;
+    int coretemp_max = 0, coretemp_temp = 0;
+
+    psu_type_t psu_mod_type = 0;
+    int        psu_temp_idx = 0, psu_tid_start = 0;
+    int        thermal_cnt  = 0;
 
     tid = ONLP_OID_ID_GET(id);
 
     pcb_id = get_pcb_id();
-    if (pcb_id == 1)
+
+    if (pcb_id == 1) {
         *info = tinfo_r02[tid];
-    else
+        thermal_cnt = CHASSIS_THERMAL_COUNT_R02;
+    }
+    else {
         *info = tinfo[tid];
+        thermal_cnt = CHASSIS_THERMAL_COUNT;
+    }
+
+    psu_tid_start = thermal_cnt + 1;
+
+    /*Assign psu temperature threshold value*/
+    if( tid >= psu_tid_start ) {
+        psu_mod_type = get_psu_type(tid, psu_tid_start, NULL, 0);
+
+        if( psu_mod_type != PSU_TYPE_UNKNOWN )
+        {
+            psu_temp_idx = ( tid - psu_tid_start ) % NUM_OF_THERMAL_PER_PSU; /*0~2*/
+            info->thresholds.warning  = threshold[psu_mod_type][psu_temp_idx].warning;
+            info->thresholds.error    = threshold[psu_mod_type][psu_temp_idx].error;
+            info->thresholds.shutdown = threshold[psu_mod_type][psu_temp_idx].shutdown;
+        }
+    }
 
     if (tid == THERMAL_CPU_CORE) {
-        return onlp_file_read_int_max(&info->mcelsius, cpu_coretemp_files);
+        for (size_t i = 0; i < sysfs_count; i++) {
+            if (onlp_file_read_int(&coretemp_temp, temp_entries[i].name) < 0) {
+                AIM_LOG_ERROR("Unable to read status from file (%s)\r\n", temp_entries[i].name);
+                return ONLP_STATUS_E_INTERNAL;
+            }
+            if (coretemp_temp > coretemp_max)
+                coretemp_max = coretemp_temp;
+        }
+
+        info->mcelsius = coretemp_max;
+
+        return ONLP_STATUS_OK;
     }
 
     if (pcb_id == 1)
