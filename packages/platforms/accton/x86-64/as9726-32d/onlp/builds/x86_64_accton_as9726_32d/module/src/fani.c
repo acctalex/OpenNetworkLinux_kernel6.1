@@ -197,16 +197,14 @@ static int _onlp_fani_info_get_fan_on_psu(int pid, onlp_fan_info_t* info)
 	int val = 0;
 
 	info->status |= ONLP_FAN_STATUS_PRESENT;
+    /* get psu power_good */
+    if (psu_status_info_get(pid, "psu_power_good", &val) == ONLP_STATUS_OK) {
+        info->status |= (val != PSU_STATUS_POWER_GOOD) ? ONLP_FAN_STATUS_FAILED : 0;
+    }
 
 	/* get fan direction
 	 */
 	info->status |= _onlp_get_fan_direction_on_psu(pid);
-
-	/* get fan fault status
- 	 */
-	if (psu_pmbus_info_get(pid, "psu_fan1_fault", &val) == 
-	    ONLP_STATUS_OK)
-		info->status |= (val > 0) ? ONLP_FAN_STATUS_FAILED : 0;
 
 	/* get fan speed
 	 */

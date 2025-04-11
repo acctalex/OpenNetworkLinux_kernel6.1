@@ -218,6 +218,7 @@ int psu_serial_number_get(int id, char *serial, int serial_len, char* model_name
 
     ret = onlp_file_read((uint8_t*)serial, PSU_SERIAL_NUMBER_LEN, &size, "%s%s", prefix, "psu_serial_number");
     if (ret != ONLP_STATUS_OK || size != PSU_SERIAL_NUMBER_LEN) {
+        serial[0] = '\0'; /* SN = NULL */
 		return ONLP_STATUS_E_INTERNAL;
 
     }
