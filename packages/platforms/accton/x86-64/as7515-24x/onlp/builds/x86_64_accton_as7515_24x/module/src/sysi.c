@@ -94,12 +94,10 @@ static struct thermal_policy_manager tp_mgr = {
     }
 };
 
-#define BIOS_VER_PATH "/sys/devices/virtual/dmi/id/bios_version"
-
 static char* cpld_ver_path[NUM_OF_CPLD_VER] = {
-    "/sys/devices/platform/as7515_24x_fpga/version", /* FPGA */
-    "/sys/bus/i2c/devices/2-0061/version", /* CPLD */
-    "/sys/bus/i2c/devices/8-0066/hwmon/hwmon*version" /* Fan CPLD */
+    FPGA_VER_PATH,
+    CPLD_VER_PATH,
+    FAN_CPLD_VER_PATH
 };
 
 const char*
@@ -112,10 +110,14 @@ int
 onlp_sysi_onie_data_get(uint8_t** data, int* size)
 {
     uint8_t* rdata = aim_zmalloc(256);
-    if (onlp_file_read(rdata, 256, size, IDPROM_PATH) == ONLP_STATUS_OK) {
-        if(*size == 256) {
-            *data = rdata;
-            return ONLP_STATUS_OK;
+    int bus_offset = 0;
+
+    if(get_i2c_bus_offset(&bus_offset) == ONLP_STATUS_OK) {
+        if (onlp_file_read(rdata, 256, size, IDPROM_PATH, 4+bus_offset) == ONLP_STATUS_OK) {
+            if(*size == 256) {
+                *data = rdata;
+                return ONLP_STATUS_OK;
+            }
         }
     }
 
@@ -160,9 +162,13 @@ onlp_sysi_platform_info_get(onlp_platform_info_t* pi)
     int i, len, ret = ONLP_STATUS_OK;
     char *v[NUM_OF_CPLD_VER] = { NULL };
     char *bios_ver = NULL;
-    char onie_vseion[15];
+    char onie_version[15];
     uint8_t* eeprom_data = NULL;
     int size;
+    int bus_offset = 0;
+
+    if(get_i2c_bus_offset(&bus_offset) != ONLP_STATUS_OK)
+        return ONLP_STATUS_E_INTERNAL;
 
     for (i = 0; i < AIM_ARRAYSIZE(cpld_ver_path); i++) {
         if (i == 2) {
@@ -173,7 +179,10 @@ onlp_sysi_platform_info_get(onlp_platform_info_t* pi)
                 break;
             }
 
-            len = onlp_file_read_str(&v[i], FAN_SYSFS_FORMAT_1, hwmon_idx, "version");
+            len = onlp_file_read_str(&v[i], FAN_SYSFS_FORMAT_1, 8+bus_offset, hwmon_idx, "version");
+        }
+        else if (i == 1) {
+            len = onlp_file_read_str(&v[i], cpld_ver_path[i], 2+bus_offset);
         }
         else {
             len = onlp_file_read_str(&v[i], cpld_ver_path[i]);
@@ -186,22 +195,26 @@ onlp_sysi_platform_info_get(onlp_platform_info_t* pi)
     }
     /*ONIE version*/
     onlp_sysi_onie_data_get(&eeprom_data, &size);
-    for (i = 0x7e; i < 0x8b; i++) {
-        onie_vseion[i-0x7e] =  eeprom_data[i];
+
+    if (eeprom_data != NULL) {
+        for (i = 0x7e; i < 0x8b; i++) {
+            onie_version[i-0x7e] =  eeprom_data[i];
+        }
+        eeprom_data[15] = '\0';
     }
-    eeprom_data[15] = '\0';
+
     /*BIOS version*/
     onlp_file_read_str(&bios_ver, BIOS_VER_PATH);
 
     if (ret == ONLP_STATUS_OK) {
-        pi->cpld_versions = aim_fstrdup("\r\n\t   FPGA:%s"
-                                        "\r\n\t   CPLD:%s"
-                                        "\r\n\t   Fan CPLD:%s"
+        pi->cpld_versions = aim_fstrdup("\r\n\t   FPGA: %s"
+                                        "\r\n\t   CPLD: %s"
+                                        "\r\n\t   Fan CPLD: %s"
                                         , v[0], v[1], v[2]);
     }
 
     pi->other_versions = aim_fstrdup("\r\n\t   BIOS: %s\r\n\t   ONIE: %s"
-                                        , bios_ver, onie_vseion);
+                                        , bios_ver, onie_version);
 
     for (i = 0; i < AIM_ARRAYSIZE(v); i++) {
         AIM_FREE_IF_PTR(v[i]);

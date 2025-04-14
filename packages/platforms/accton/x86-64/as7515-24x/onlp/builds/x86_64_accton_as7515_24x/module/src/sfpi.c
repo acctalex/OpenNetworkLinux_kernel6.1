@@ -28,6 +28,7 @@
 #include <onlplib/file.h>
 #include "x86_64_accton_as7515_24x_int.h"
 #include "x86_64_accton_as7515_24x_log.h"
+#include "platform_lib.h"
 
 #define VALIDATE_SFP(_port) \
     do { \
@@ -221,10 +222,13 @@ onlp_sfpi_eeprom_read(int port, uint8_t data[256])
      * Return MISSING if SFP is missing.
      * Return OK if eeprom is read
      */
-    int size = 0;
+    int size = 0, bus_offset = 0;
     memset(data, 0, 256);
 
-    if(onlp_file_read(data, 256, &size, MODULE_EEPROM_FORMAT, PORT_BUS_INDEX(port)) != ONLP_STATUS_OK) {
+    if(get_i2c_bus_offset(&bus_offset) != ONLP_STATUS_OK)
+        return ONLP_STATUS_E_INTERNAL;
+
+    if(onlp_file_read(data, 256, &size, MODULE_EEPROM_FORMAT, PORT_BUS_INDEX(port)+bus_offset) != ONLP_STATUS_OK) {
         AIM_LOG_ERROR("Unable to read eeprom from port(%d)\r\n", port);
         return ONLP_STATUS_E_INTERNAL;
     }
@@ -242,8 +246,12 @@ onlp_sfpi_dom_read(int port, uint8_t data[256])
 {
     FILE* fp;
     char file[64] = {0};
+    int bus_offset = 0;
 
-    sprintf(file, MODULE_EEPROM_FORMAT, PORT_BUS_INDEX(port));
+    if(get_i2c_bus_offset(&bus_offset) != ONLP_STATUS_OK)
+        return ONLP_STATUS_E_INTERNAL;
+
+    sprintf(file, MODULE_EEPROM_FORMAT, PORT_BUS_INDEX(port)+bus_offset);
     fp = fopen(file, "r");
     if(fp == NULL) {
         AIM_LOG_ERROR("Unable to open the eeprom device file of port(%d)", port);
