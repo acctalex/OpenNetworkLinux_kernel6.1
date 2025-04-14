@@ -126,7 +126,7 @@ int
 onlp_sysi_platform_info_get(onlp_platform_info_t* pi)
 {
     int   i, v[NUM_OF_CPLD] = {0};
-    int   rv, failed_cnt = 0;
+    int   rv;
     onlp_onie_info_t onie;
     char *bios_ver = NULL;
     char *paths[] = {IDPROM_PATH_2, IDPROM_PATH_1};
@@ -135,27 +135,14 @@ onlp_sysi_platform_info_get(onlp_platform_info_t* pi)
 
     for (i = 0 ; i < AIM_ARRAYSIZE(paths); i++ ){
         rv = onlp_onie_decode_file(&onie, paths[i]);
-        /* Decode failed if rv < 0 */
-        if(rv < 0)
-        {
-            failed_cnt++;
-        }
-        else
-        {
+        /* Decode succeeded if rv >= 0 */
+        if(rv >= 0)
             break;
-        }
-
-        if (failed_cnt >= 2)
-            return ONLP_STATUS_E_INTERNAL;
     }
-
 
     for (i = 0; i < NUM_OF_CPLD; i++) {
         v[i] = 0;
-
-        if(onlp_file_read_int(v+i, "%s%s/version", PREFIX_PATH_ON_CPLD_DEV, arr_cplddev_name[i]) < 0) {
-            return ONLP_STATUS_E_INTERNAL;
-        }
+        onlp_file_read_int(v+i, "%s%s/version", PREFIX_PATH_ON_CPLD_DEV, arr_cplddev_name[i]);
     }
 
     pi->cpld_versions = aim_fstrdup("\r\n\t   CPU CPLD(0x65): %02X"
