@@ -26,6 +26,8 @@
 #ifndef __PLATFORM_LIB_H__
 #define __PLATFORM_LIB_H__
 
+#include <unistd.h>
+#include <pthread.h>
 #include "x86_64_accton_as9817_64_log.h"
 
 #define CHASSIS_FAN_COUNT      8
@@ -43,6 +45,13 @@
 #define FAN_SYSFS_FORMAT_1 "/sys/devices/platform/as9817_64_fan/hwmon/hwmon%d/%s"
 #define SYS_LED_PATH   "/sys/devices/platform/as9817_64_led/"
 #define IDPROM_PATH "/sys/bus/i2c/devices/68-0056/eeprom"
+#define BMC_FAN_CONTROLLER_PATH "/sys/devices/platform/as9817_64_sys/bmc_fan_controller"
+#define BMC_THERMAL_DATA_PATH   "/sys/devices/platform/as9817_64_sys/bmc_thermal_data"
+#define FPGA_VER_PATH  "/sys/devices/platform/as9817_64_sys/fpga_version"
+#define FGPA_MAC_MIN_TEMP_PATH "/sys/devices/platform/as9817_64_fpga/mac_min_temp"
+#define FGPA_MAC_MAX_TEMP_PATH "/sys/devices/platform/as9817_64_fpga/mac_max_temp"
+#define BMC_VER1_PATH  "/sys/devices/platform/ipmi_bmc.0/firmware_revision"
+#define BMC_VER2_PATH  "/sys/devices/platform/ipmi_bmc.0/aux_firmware_revision"
 
 enum onlp_thermal_id {
     THERMAL_RESERVED = 0,
@@ -89,6 +98,7 @@ enum onlp_fan_dir onlp_get_fan_dir(int fid);
 int onlp_get_psu_hwmon_idx(int pid);
 int onlp_get_fan_hwmon_idx(void);
 as9817_64_platform_id_t get_platform_id(void);
+int get_bmc_version(int *ver);
 
 #define AIM_FREE_IF_PTR(p) \
     do \
