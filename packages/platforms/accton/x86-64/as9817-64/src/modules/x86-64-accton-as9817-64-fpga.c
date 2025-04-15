@@ -59,6 +59,14 @@
 
 #define FPGA_PCIE_START_OFFSET         0x0000
 #define FPGA_BOARD_INFO_REG            (FPGA_PCIE_START_OFFSET + 0x00)
+#define FPGA_MAC_MIN_TEMP1_REG         (FPGA_PCIE_START_OFFSET + 0xA0)
+#define FPGA_MAC_MIN_TEMP2_REG         (FPGA_PCIE_START_OFFSET + 0xA1)
+#define FPGA_MAC_MIN_TEMP3_REG         (FPGA_PCIE_START_OFFSET + 0xA2)
+#define FPGA_MAC_MIN_TEMP4_REG         (FPGA_PCIE_START_OFFSET + 0xA3)
+#define FPGA_MAC_MAX_TEMP1_REG         (FPGA_PCIE_START_OFFSET + 0xA4)
+#define FPGA_MAC_MAX_TEMP2_REG         (FPGA_PCIE_START_OFFSET + 0xA5)
+#define FPGA_MAC_MAX_TEMP3_REG         (FPGA_PCIE_START_OFFSET + 0xA6)
+#define FPGA_MAC_MAX_TEMP4_REG         (FPGA_PCIE_START_OFFSET + 0xA7)
 
 /* CPLD 1 */
 #define CPLD1_PCIE_START_OFFSET        0x2000
@@ -363,7 +371,9 @@ enum fpga_sysfs_attributes {
     CPLD2_VERSION,
     CPLD1_REG,
     CPLD2_REG,
-    PLATFORM_ID
+    PLATFORM_ID,
+    MAC_MIN_TEMP,
+    MAC_MAX_TEMP
 };
 
 
@@ -469,6 +479,8 @@ static SENSOR_DEVICE_ATTR(cpld2_version, S_IRUGO, status_read, NULL, CPLD2_VERSI
 static SENSOR_DEVICE_ATTR(cpld1_reg, S_IRUGO|S_IWUSR, reg_read, reg_write, CPLD1_REG);
 static SENSOR_DEVICE_ATTR(cpld2_reg, S_IRUGO|S_IWUSR, reg_read, reg_write, CPLD2_REG);
 static SENSOR_DEVICE_ATTR(platform_id, S_IRUGO, status_read, NULL, PLATFORM_ID);
+static SENSOR_DEVICE_ATTR(mac_min_temp, S_IRUGO, status_read, NULL, MAC_MIN_TEMP);
+static SENSOR_DEVICE_ATTR(mac_max_temp, S_IRUGO, status_read, NULL, MAC_MAX_TEMP);
 
 static struct attribute *fpga_transceiver_attributes[] = {
     DECLARE_TRANSCEIVER_ATTR(1),
@@ -549,6 +561,8 @@ static struct attribute *fpga_transceiver_attributes[] = {
     &sensor_dev_attr_cpld1_reg.dev_attr.attr,
     &sensor_dev_attr_cpld2_reg.dev_attr.attr,
     &sensor_dev_attr_platform_id.dev_attr.attr,
+    &sensor_dev_attr_mac_min_temp.dev_attr.attr,
+    &sensor_dev_attr_mac_max_temp.dev_attr.attr,
     NULL
 };
 
@@ -715,9 +729,10 @@ static ssize_t status_read(struct device *dev, struct device_attribute *da, char
     struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
     struct as9817_64_fpga_data *fpga_ctl = dev_get_drvdata(dev);
     ssize_t ret = -EINVAL;
-    u16 reg;
+    u16 reg, tmp;
     u8 major, minor, reg_val;
     u8 bits_shift;
+    u8 mac_temp_val[4];
 
     switch(attr->index)
     {
@@ -767,6 +782,28 @@ static ssize_t status_read(struct device *dev, struct device_attribute *da, char
             break;
         case PLATFORM_ID:
             ret = sprintf(buf, "%d\n", fpga_ctl->platform_id);
+            break;
+        case MAC_MIN_TEMP:
+            tmp = ioread16(fpga_ctl->pci_fpga_dev.data_base_addr0 + FPGA_MAC_MIN_TEMP1_REG);
+            mac_temp_val[0] = tmp & 0xFF;
+            mac_temp_val[1] = (tmp >> 8) & 0xFF;
+            tmp = ioread16(fpga_ctl->pci_fpga_dev.data_base_addr0 + FPGA_MAC_MIN_TEMP3_REG);
+            mac_temp_val[2] = tmp & 0xFF;
+            mac_temp_val[3] = (tmp >> 8) & 0xFF;
+            ret = sprintf(buf, "%02x %02x %02x %02x\n", 
+                               mac_temp_val[0], mac_temp_val[1], 
+                               mac_temp_val[2], mac_temp_val[3]);
+            break;
+        case MAC_MAX_TEMP:
+            tmp = ioread16(fpga_ctl->pci_fpga_dev.data_base_addr0 + FPGA_MAC_MAX_TEMP1_REG);
+            mac_temp_val[0] = tmp & 0xFF;
+            mac_temp_val[1] = (tmp >> 8) & 0xFF;
+            tmp = ioread16(fpga_ctl->pci_fpga_dev.data_base_addr0 + FPGA_MAC_MAX_TEMP3_REG);
+            mac_temp_val[2] = tmp & 0xFF;
+            mac_temp_val[3] = (tmp >> 8) & 0xFF;
+            ret = sprintf(buf, "%02x %02x %02x %02x\n", 
+                               mac_temp_val[0], mac_temp_val[1], 
+                               mac_temp_val[2], mac_temp_val[3]);
             break;
         default:
             break;

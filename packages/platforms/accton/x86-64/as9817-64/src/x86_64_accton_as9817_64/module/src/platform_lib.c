@@ -115,54 +115,6 @@ as9817_64_platform_id_t get_platform_id(void)
 }
 
 /**
- * Read multiple bytes from an I2C device at specified register offset.
- * Automatically opens/closes /dev/i2c-X
- *
- * @param bus I2C bus number (e.g., 0 for /dev/i2c-0)
- * @param addr I2C slave address
- * @param reg Start register offset
- * @param buf Buffer to store data
- * @param len Number of bytes to read
- * @return 0 on success, < 0 on failure
- */
-int i2cget_bytes(int bus, uint8_t addr, uint8_t reg, uint8_t *buf, size_t len)
-{
-    char dev_path[32];
-    int fd;
-
-    if (len == 0 || len > 32) {
-        AIM_LOG_ERROR("Invalid I2C read length: %zu (must be 1 to 32)\n", len);
-        return ONLP_STATUS_E_INVALID;
-    }
-
-    if (snprintf(dev_path, sizeof(dev_path), "/dev/i2c-%d", bus) >= (int)sizeof(dev_path)) {
-        AIM_LOG_ERROR("Device path too long\n");
-        return ONLP_STATUS_E_INVALID;
-    }
-
-    fd = open(dev_path, O_RDWR);
-    if (fd < 0) {
-        AIM_LOG_ERROR("Failed to open %s\n", dev_path);
-        return ONLP_STATUS_E_INTERNAL;
-    }
-
-    if (ioctl(fd, I2C_SLAVE, addr) < 0) {
-        AIM_LOG_ERROR("Failed to set I2C slave 0x%02X\n", addr);
-        close(fd);
-        return ONLP_STATUS_E_INTERNAL;
-    }
-
-    if (i2c_smbus_read_i2c_block_data(fd, reg, len, buf) < 0) {
-        AIM_LOG_ERROR("SMBus block read failed at reg 0x%02X\n", reg);
-        close(fd);
-        return ONLP_STATUS_E_INTERNAL;
-    }
-
-    close(fd);
-    return ONLP_STATUS_OK;
-}
-
-/**
  * get_bmc_version - Get BMC version as int array
  * @ver: int[3], ver[0]=major, ver[1]=minor, ver[2]=aux last byte
  *

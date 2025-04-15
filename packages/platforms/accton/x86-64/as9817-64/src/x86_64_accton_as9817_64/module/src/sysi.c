@@ -252,7 +252,10 @@ int onlp_sysi_get_cpu_temp(temp_reader_data_t *temp)
 }
 
 /**
- * Reads a 32-bit frequency from FPGA via I2C and calculates temperature in Celsius.
+ * Reads a 32-bit frequency value from sysfs file (formatted as 4 space-separated hex bytes),
+ * and converts it into temperature in Celsius using a datasheet-defined formula.
+ *
+ * Expected input file content format: "A0 A1 A2 A3"
  *
  * Datasheet Formula:
  *   Period = (Data + 1) x 80 ns
@@ -260,31 +263,41 @@ int onlp_sysi_get_cpu_temp(temp_reader_data_t *temp)
  *   -> Data = (1 / freq / 80e-9) - 1
  *   -> Temp = -0.317704 x Data + 476.359
  *
- * @param clk_addr_start  I2C register address to start reading (e.g. 0xA0 for min, 0xA4 for max)
- * @param bus             I2C bus number (e.g. 9)
- * @param addr            I2C device address (e.g. 0x58)
+ * @param file_path       Path to the file containing the 32-bit frequency as 4 hex values.
  * @param temp            Pointer to store the resulting temperature in Celsius
  * @return                ONLP_STATUS_OK if successful;
  *                        ONLP_STATUS_E_MISSING if I2C read fails, frequency is 0,
  *                        or calculated Data is out of expected range.
  */
-int get_mac_temperature_from_fpga(uint8_t clk_addr_start, int bus, uint8_t addr, float *temp)
+int get_mac_temperature_from_fpga(const char *file_path, float *temp)
 {
     uint8_t bytes[4] = {0, 0, 0, 0};
     uint32_t freq = 0;
     int ret;
     double period, data;
+    char *tmp = NULL;
 
-    if (temp == NULL) {
-        AIM_LOG_ERROR("Null pointer passed for temperature result\n");
+    if (file_path == NULL || temp == NULL) {
+        AIM_LOG_ERROR("Null pointer passed for file_path or temperature result\n");
         return ONLP_STATUS_E_MISSING;
     }
 
-    ret = i2cget_bytes(bus, addr, clk_addr_start, bytes, sizeof(bytes));
-    if (ret != ONLP_STATUS_OK) {
-        AIM_LOG_ERROR("Failed to read 4-byte frequency from 0x%02X\n", clk_addr_start);
+    ret = onlp_file_read_str(&tmp, file_path);
+    if (ret <= 0) {
+        AIM_LOG_ERROR("Failed to read 4-byte frequency from %s\n", file_path);
         return ONLP_STATUS_E_MISSING;
     }
+    ret = sscanf(tmp, "%x %x %x %x",
+                 (unsigned int *)&bytes[0], 
+                 (unsigned int *)&bytes[1],
+                 (unsigned int *)&bytes[2],
+                 (unsigned int *)&bytes[3]);
+    if (ret != 4) {
+        AIM_FREE_IF_PTR(tmp);
+        AIM_LOG_ERROR("Expected 4 hex values from %s, got %d\n", file_path, ret);
+        return ONLP_STATUS_E_MISSING;
+    }
+    AIM_FREE_IF_PTR(tmp);
 
     freq = ((uint32_t)bytes[0]) |
            ((uint32_t)bytes[1] << 8) |
@@ -311,17 +324,13 @@ int get_mac_temperature_from_fpga(uint8_t clk_addr_start, int bus, uint8_t addr,
 int onlp_sysi_get_mac_temp(temp_reader_data_t *temp)
 {
     int ret;
-    int bus = 0;
-    uint8_t addr = 0x60;
-    uint8_t reg_min = 0xA0;
-    uint8_t reg_max = 0xA4;
     float min_temp, max_temp;
 
-    ret = get_mac_temperature_from_fpga(reg_min, bus, addr, &min_temp);
+    ret = get_mac_temperature_from_fpga(FGPA_MAC_MIN_TEMP_PATH, &min_temp);
     if (ret != ONLP_STATUS_OK) {
         return ret;
     }
-    ret = get_mac_temperature_from_fpga(reg_max, bus, addr, &max_temp);
+    ret = get_mac_temperature_from_fpga(FGPA_MAC_MAX_TEMP_PATH, &max_temp);
     if (ret != ONLP_STATUS_OK) {
         return ret;
     }
@@ -765,7 +774,6 @@ void *thermal_policy_thread_loop(void *arg)
 
         ret = control_thermal_policy_via_bmc();
         if (ret != ONLP_STATUS_OK) {
-            AIM_LOG_WARN("Fallback to CPU-controlled thermal policy");
             control_thermal_policy_via_cpu();
         }
     }
