@@ -271,9 +271,7 @@ onlp_thermali_info_get(onlp_oid_t id, onlp_thermal_info_t* info)
 
             psu_id = ( tid == THERMAL_1_ON_PSU1 ) ? PSU1_ID : PSU2_ID;
             /* Get power good status */
-            if (psu_status_info_get(psu_id, "psu_power_good", &val) != ONLP_STATUS_OK) {
-                AIM_LOG_ERROR("Unable to read PSU(%d) node(psu_power_good)\r\n", psu_id);
-            }
+            psu_status_info_get(psu_id, "psu_power_good", &val);
 
 			break;
 		default:
