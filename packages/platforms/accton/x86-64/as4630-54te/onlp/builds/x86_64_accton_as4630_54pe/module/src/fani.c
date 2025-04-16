@@ -134,28 +134,21 @@ _onlp_fani_info_get_fan(int fid, onlp_fan_info_t* info)
 }
 
 static uint32_t
-_onlp_get_fan_direction_on_psu(void)
+_onlp_get_fan_direction_on_psu(int pid)
 {
-    /* Try to read direction from PSU1.
-     * If PSU1 is not valid, read from PSU2
-     */
-    int i = 0;
+    psu_type_t psu_type;
+    psu_type = get_psu_type(pid, NULL, 0);
 
-    for (i = PSU1_ID; i <= PSU2_ID; i++) {
-        psu_type_t psu_type;
-        psu_type = get_psu_type(i, NULL, 0);
-
-        if (psu_type == PSU_TYPE_UNKNOWN) {
-            continue;
-        }
-
-        if (PSU_TYPE_YM1151D_F2B == psu_type ||
-            PSU_TYPE_YM1151F_F2B == psu_type) {
+    switch (psu_type) {
+        case PSU_TYPE_YM1151D_F2B:
+        case PSU_TYPE_YM1151F_F2B:
             return ONLP_FAN_STATUS_F2B;
-        }
-        else {
+        case PSU_TYPE_YM1151D_B2F:
             return ONLP_FAN_STATUS_B2F;
-        }
+        case PSU_TYPE_UNKNOWN:
+            return 0;
+        default:
+            return 0;
     }
 
     return 0;
@@ -170,12 +163,11 @@ _onlp_fani_info_get_fan_on_psu(int pid, onlp_fan_info_t* info)
 
     /* get fan direction
      */
-    info->status |= _onlp_get_fan_direction_on_psu();
+    info->status |= _onlp_get_fan_direction_on_psu(pid);
 
-    /* get fan fault status
-     */
-    if (psu_pmbus_info_get(pid, "psu_fan1_fault", &val) == ONLP_STATUS_OK) {
-        info->status |= (val > 0) ? ONLP_FAN_STATUS_FAILED : 0;
+    /* get psu power_good */
+    if (psu_status_info_get(pid, "psu_power_good", &val) == ONLP_STATUS_OK) {
+        info->status |= (val != PSU_STATUS_POWER_GOOD) ? ONLP_FAN_STATUS_FAILED : 0;
     }
 
     /* get fan speed

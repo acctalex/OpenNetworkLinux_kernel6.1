@@ -352,7 +352,8 @@ onlp_thermali_init(void)
 int
 onlp_thermali_info_get(onlp_oid_t id, onlp_thermal_info_t* info)
 {
-    int tid;
+    int tid, psu_id;
+    int val = 0;
     VALIDATE(id);
     int pcb_id = 0;
     int coretemp_max = 0, coretemp_temp = 0;
@@ -386,6 +387,14 @@ onlp_thermali_info_get(onlp_oid_t id, onlp_thermal_info_t* info)
             info->thresholds.warning  = threshold[psu_mod_type][psu_temp_idx].warning;
             info->thresholds.error    = threshold[psu_mod_type][psu_temp_idx].error;
             info->thresholds.shutdown = threshold[psu_mod_type][psu_temp_idx].shutdown;
+        }
+
+        psu_id = ( tid < (psu_tid_start + NUM_OF_THERMAL_PER_PSU) ) ? PSU1_ID : PSU2_ID;
+
+        /* Get power good status */
+        onlp_file_read_int(&val, "%s""psu%d_power_good", PSU_SYSFS_PATH, psu_id);
+        if(val != PSU_STATUS_POWER_GOOD) {
+            info->status |= ONLP_THERMAL_STATUS_FAILED;
         }
     }
 

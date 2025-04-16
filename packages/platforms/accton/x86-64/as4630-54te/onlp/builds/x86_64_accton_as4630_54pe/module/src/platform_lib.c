@@ -46,6 +46,14 @@ int psu_pmbus_info_get(int id, char *node, int *value)
     return onlp_file_read_int(value, "%s%s", path[id-1], node);
 }
 
+int psu_status_info_get(int id, char *node, int *value)
+{
+    char *path[] = { PSU1_AC_EEPROM_PREFIX, PSU2_AC_EEPROM_PREFIX };
+    *value = 0;
+
+    return onlp_file_read_int(value, "%s%s", path[id-1], node);
+}
+
 int get_psu_eeprom_str(int id, char *data_buf, int data_len, char *data_name)
 {
     int   len    = 0;
