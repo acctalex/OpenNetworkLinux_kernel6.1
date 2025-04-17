@@ -37,15 +37,22 @@
 #define PSU1_ID 1
 #define PSU2_ID 2
 
-#define PSU1_EEPROM_SYSFS_FORMAT "/sys/bus/i2c/devices/6-0052"
-#define PSU2_EEPROM_SYSFS_FORMAT "/sys/bus/i2c/devices/7-0050"
-#define PSU1_PMBUS_SYSFS_FORMAT "/sys/bus/i2c/devices/6-005a"
-#define PSU2_PMBUS_SYSFS_FORMAT "/sys/bus/i2c/devices/7-0058"
+#define PSU1_EEPROM_SYSFS_FORMAT "/sys/bus/i2c/devices/%d-0052"
+#define PSU2_EEPROM_SYSFS_FORMAT "/sys/bus/i2c/devices/%d-0050"
+#define PSU1_PMBUS_SYSFS_FORMAT "/sys/bus/i2c/devices/%d-005a"
+#define PSU2_PMBUS_SYSFS_FORMAT "/sys/bus/i2c/devices/%d-0058"
 
-#define FAN_SYSFS_FORMAT   "/sys/bus/i2c/devices/8-0066*fan%d_%s"
-#define FAN_SYSFS_FORMAT_1 "/sys/bus/i2c/devices/8-0066/hwmon/hwmon%d/%s"
+#define FAN_SYSFS_FORMAT   "/sys/bus/i2c/devices/%d-0066*fan%d_%s"
+#define FAN_SYSFS_FORMAT_1 "/sys/bus/i2c/devices/%d-0066/hwmon/hwmon%d/%s"
+#define FAN_SYSFS_FORMAT_2 "/sys/bus/i2c/devices/%d-0066/hwmon/hwmon%d/"
 #define SYS_LED_FORMAT   "/sys/devices/platform/as7515_24x_led/led_%s"
-#define IDPROM_PATH "/sys/bus/i2c/devices/4-0056/eeprom"
+#define IDPROM_PATH "/sys/bus/i2c/devices/%d-0056/eeprom"
+
+// version path 
+#define BIOS_VER_PATH "/sys/devices/virtual/dmi/id/bios_version"
+#define FPGA_VER_PATH "/sys/devices/platform/as7515_24x_fpga/version"
+#define CPLD_VER_PATH "/sys/bus/i2c/devices/%d-0061/version"
+#define FAN_CPLD_VER_PATH "/sys/bus/i2c/devices/%d-0066/hwmon/hwmon*version"
 
 enum onlp_thermal_id {
     THERMAL_RESERVED = 0,
@@ -77,6 +84,7 @@ int psu_eeprom_str_get(int pid, char *data_buf, int data_len, char *data_name);
 int onlp_get_psu_hwmon_idx(int pid);
 int onlp_get_fan_hwmon_idx(void);
 int fan_info_get(int fid, char *node, int *value);
+int get_i2c_bus_offset(int *bus_offset);
 
 #define AIM_FREE_IF_PTR(p) \
     do \
