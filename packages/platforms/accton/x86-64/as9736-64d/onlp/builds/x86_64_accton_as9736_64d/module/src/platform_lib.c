@@ -69,6 +69,26 @@ int psu_pmbus_info_get(int id, char *node, int *value)
 	return ret;
 }
 
+int psu_status_info_get(int id, char *node, int *value)
+{
+    int ret = 0;
+    char path[PSU_NODE_MAX_PATH_LEN] = {0};
+
+    *value = 0;
+
+    if (PSU1_ID == id)
+        sprintf(path, "%s%s", PSU1_AC_HWMON_PREFIX, node);
+    else if (PSU2_ID == id)
+        sprintf(path, "%s%s", PSU2_AC_HWMON_PREFIX, node);
+
+    if (onlp_file_read_int(value, path) < 0) {
+        AIM_LOG_ERROR("Unable to read status from file(%s)\r\n", path);
+        return ONLP_STATUS_E_INTERNAL;
+    }
+
+    return ret;
+}
+
 int psu_ym2651y_pmbus_info_set(int id, char *node, int value)
 {
 	char path[PSU_NODE_MAX_PATH_LEN] = {0};

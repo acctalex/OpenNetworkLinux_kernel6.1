@@ -231,7 +231,8 @@ onlp_thermali_init(void)
 int
 onlp_thermali_info_get(onlp_oid_t id, onlp_thermal_info_t* info)
 {
-    int   tid;
+    int   tid, psu_id;
+    int   val = 0;
 	char *format   = NULL;
 	char  path[64] = {0};
     VALIDATE(id);
@@ -267,6 +268,11 @@ onlp_thermali_info_get(onlp_oid_t id, onlp_thermal_info_t* info)
     	case THERMAL_1_ON_PSU1:
     	case THERMAL_1_ON_PSU2:
 			format = PSU_THERMAL_PATH_FORMAT;
+
+            psu_id = ( tid == THERMAL_1_ON_PSU1 ) ? PSU1_ID : PSU2_ID;
+            /* Get power good status */
+            psu_status_info_get(psu_id, "psu_power_good", &val);
+
 			break;
 		default:
 			return ONLP_STATUS_E_INVALID;
@@ -274,9 +280,18 @@ onlp_thermali_info_get(onlp_oid_t id, onlp_thermal_info_t* info)
 	
     /* get path */
     sprintf(path, format, directory[tid], tid);
-    if (onlp_file_read_int(&info->mcelsius, path) < 0) {
-        AIM_LOG_ERROR("Unable to read status from file (%s)\r\n", path);
-        return ONLP_STATUS_E_INTERNAL;
+
+    /*When PSU status is unplugged, show thermal info
+      (thermal)info->status: show "FAILED"*/
+      if ( (tid >= THERMAL_1_ON_PSU1) && (tid <= THERMAL_1_ON_PSU2) && (val != PSU_STATUS_POWER_GOOD) ) {
+        info->status |=  ONLP_THERMAL_STATUS_FAILED;
+        info->mcelsius = 0;
+    }
+    else {
+        if (onlp_file_read_int(&info->mcelsius, path) < 0) {
+            AIM_LOG_ERROR("Unable to read status from file (%s)\r\n", path);
+            return ONLP_STATUS_E_INTERNAL;
+        }
     }
 
     return ONLP_STATUS_OK;								
