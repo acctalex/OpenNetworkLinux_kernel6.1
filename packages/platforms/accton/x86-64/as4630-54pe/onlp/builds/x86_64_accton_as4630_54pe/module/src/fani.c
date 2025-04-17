@@ -162,14 +162,14 @@ _onlp_get_fan_direction_on_psu(int pid)
         case PSU_TYPE_ACBEL:
         case PSU_TYPE_YM2651Y:
         case PSU_TYPE_YPEB1200A:
-            return ONLP_FAN_STATUS_B2F;
+        case PSU_TYPE_UP1K21R_1085G:
         case PSU_TYPE_AC_F2B:
             return ONLP_FAN_STATUS_F2B;
+        case PSU_TYPE_AC_B2F:
+            return ONLP_FAN_STATUS_B2F;
         default:
             return 0;
     }
-
-    return 0;
 }
 
 static int

@@ -139,19 +139,18 @@ _onlp_get_fan_direction_on_psu(int pid)
     psu_type_t psu_type;
     psu_type = get_psu_type(pid, NULL, 0);
 
+
     switch (psu_type) {
         case PSU_TYPE_YM1151D_F2B:
         case PSU_TYPE_YM1151F_F2B:
+        case PSU_TYPE_UPD1501SA_1190G_F2B:
             return ONLP_FAN_STATUS_F2B;
         case PSU_TYPE_YM1151D_B2F:
+        case PSU_TYPE_UPD1501SA_1290G_B2F:
             return ONLP_FAN_STATUS_B2F;
-        case PSU_TYPE_UNKNOWN:
-            return 0;
         default:
             return 0;
     }
-
-    return 0;
 }
 
 static int
