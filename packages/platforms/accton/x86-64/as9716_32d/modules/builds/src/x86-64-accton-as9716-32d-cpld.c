@@ -49,7 +49,7 @@ enum cpld_type {
     as9716_32d_fpga,
     as9716_32d_cpld1,
     as9716_32d_cpld2,
-    as9716_32d_cpld_cpu
+    as9716_32d_cpu_cpld
 };
 
 struct as9716_32d_cpld_data {
@@ -62,7 +62,7 @@ static const struct i2c_device_id as9716_32d_cpld_id[] = {
     { "as9716_32d_fpga", as9716_32d_fpga },
     { "as9716_32d_cpld1", as9716_32d_cpld1 },
     { "as9716_32d_cpld2", as9716_32d_cpld2 },
-    { "as9716_32d_cpld_cpu", as9716_32d_cpld_cpu },
+    { "as9716_32d_cpu_cpld", as9716_32d_cpu_cpld },
     { }
 };
 MODULE_DEVICE_TABLE(i2c, as9716_32d_cpld_id);
@@ -290,6 +290,16 @@ static const struct attribute_group as9716_32d_cpld2_group = {
 	.attrs = as9716_32d_cpld2_attributes,
 };
 
+
+static struct attribute *as9716_32d_cpu_cpld_attributes[] = {
+    &sensor_dev_attr_version.dev_attr.attr,
+    &sensor_dev_attr_access.dev_attr.attr,
+	NULL
+};
+
+static const struct attribute_group as9716_32d_cpu_cpld_group = {
+	.attrs = as9716_32d_cpu_cpld_attributes,
+};
 
 static ssize_t show_status(struct device *dev, struct device_attribute *da,
              char *buf)
@@ -626,15 +636,17 @@ static int as9716_32d_cpld_probe(struct i2c_client *client,
         break;
     case as9716_32d_cpld2:
         group = &as9716_32d_cpld2_group;
-         break; 
-     case as9716_32d_cpld_cpu:
-         /* Disable CPLD reset to avoid DUT will be reset.
-          */
-         status=as9716_32d_cpld_write_internal(client, 0x3, 0x0); 
-         if (status < 0)
-         {
-            dev_dbg(&client->dev, "cpu_cpld reg 0x65 err %d\n", status);            
-         }      
+        break;
+     case as9716_32d_cpu_cpld:
+        /* Disable CPLD reset to avoid DUT will be reset.
+         */
+        status=as9716_32d_cpld_write_internal(client, 0x3, 0x0);
+        if (status < 0)
+        {
+           dev_dbg(&client->dev, "cpu_cpld reg 0x65 err %d\n", status);
+        }
+        group = &as9716_32d_cpu_cpld_group;
+        break;
     default:
         break;
     }
@@ -672,6 +684,9 @@ static void as9716_32d_cpld_remove(struct i2c_client *client)
         break;
     case as9716_32d_cpld2:
         group = &as9716_32d_cpld2_group;
+        break;
+    case as9716_32d_cpu_cpld:
+        group = &as9716_32d_cpu_cpld_group;
         break;
     default:
         break;
