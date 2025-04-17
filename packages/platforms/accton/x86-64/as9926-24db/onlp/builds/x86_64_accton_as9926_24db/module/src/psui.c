@@ -28,9 +28,6 @@
 #include <onlplib/file.h>
 #include "platform_lib.h"
 
-#define PSU_STATUS_PRESENT     1
-#define PSU_STATUS_POWER_GOOD  1
-
 #define VALIDATE(_id)					\
 	do {						\
 		if(!ONLP_OID_IS_PSU(_id)) {		\
@@ -96,25 +93,6 @@ int onlp_psui_info_get(onlp_oid_t id, onlp_psu_info_t* info)
 	info->status |= ONLP_PSU_STATUS_PRESENT;
 	info->caps = ONLP_PSU_CAPS_AC;
 
-	/* Get power good status */
-	ret = onlp_file_read_int(&val, "%s""psu%d_power_good", PSU_SYSFS_PATH, 
-				 pid);
-    
-	if (ret < 0) {
-		AIM_LOG_ERROR("Unable to read status \
-			       from (%s""psu%d_power_good)\r\n", 
-			       PSU_SYSFS_PATH, pid);
-		return ONLP_STATUS_E_INTERNAL;
-	}
-
-	if (val != PSU_STATUS_POWER_GOOD) {
-		info->status |=  ONLP_PSU_STATUS_FAILED;
-	}
-
-	if (info->status & ONLP_PSU_STATUS_FAILED) {
-		return ONLP_STATUS_OK;
-	}
-
 	/* Read voltage, current and power */
 	val = 0;
 	if (onlp_file_read_int(&val, "%s""psu%d_vin", PSU_SYSFS_PATH, pid) == 0 
@@ -158,20 +136,9 @@ int onlp_psui_info_get(onlp_oid_t id, onlp_psu_info_t* info)
 		info->caps |= ONLP_PSU_CAPS_POUT;
 	}
 
-	/* Set the associated oid_table */
-	val = 0;
-	if (onlp_file_read_int(&val, "%s""psu%d_fan1_input", 
-			       PSU_SYSFS_PATH, pid) == 0 && val) {
-		info->hdr.coids[0] = ONLP_FAN_ID_CREATE(pid + 
-							CHASSIS_FAN_COUNT);
-	}
-
-	val = 0;
-	if (onlp_file_read_int(&val, "%s""psu%d_temp1_input", PSU_SYSFS_PATH,
-			       pid) == 0 && val) {
-		info->hdr.coids[1] = ONLP_THERMAL_ID_CREATE(
-					pid + CHASSIS_THERMAL_COUNT);
-	}
+    /* Set the associated oid_table */
+    info->hdr.coids[0] = ONLP_FAN_ID_CREATE(pid + CHASSIS_FAN_COUNT);
+    info->hdr.coids[1] = ONLP_THERMAL_ID_CREATE(pid + CHASSIS_THERMAL_COUNT);
 
 	/* Read model */
 	char *string = NULL;
@@ -191,6 +158,19 @@ int onlp_psui_info_get(onlp_oid_t id, onlp_psu_info_t* info)
 		info->serial[len] = '\0';
 	}
 	AIM_FREE_IF_PTR(string);
+
+    /* Get power good status */
+    ret = onlp_file_read_int(&val, "%s""psu%d_power_good", PSU_SYSFS_PATH, pid);
+
+    if (ret < 0) {
+        AIM_LOG_ERROR("Unable to read status from (%s""psu%d_power_good)\r\n", PSU_SYSFS_PATH, pid);
+        return ONLP_STATUS_E_INTERNAL;
+    }
+
+    if (val != PSU_STATUS_POWER_GOOD) {
+        info->status |=  ONLP_PSU_STATUS_UNPLUGGED;
+		info->caps = 0;
+    }
 
 	return ret;
 }
