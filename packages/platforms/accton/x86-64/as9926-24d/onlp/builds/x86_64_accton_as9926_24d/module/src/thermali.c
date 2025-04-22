@@ -156,6 +156,8 @@ int
 onlp_thermali_info_get(onlp_oid_t id, onlp_thermal_info_t* info)
 {
     int   tid;
+    int   psu_id, psu_tid_start = 0;
+    int   val = 0;
     VALIDATE(id);
 	
     tid = ONLP_OID_ID_GET(id);
@@ -165,6 +167,18 @@ onlp_thermali_info_get(onlp_oid_t id, onlp_thermal_info_t* info)
 
     if(tid == THERMAL_CPU_CORE) {
         return onlp_file_read_int_max(&info->mcelsius, cpu_coretemp_files);
+    }
+
+    psu_tid_start = CHASSIS_THERMAL_COUNT + 1;
+
+    if (tid >= psu_tid_start) {
+        psu_id = ( tid < (psu_tid_start + NUM_OF_SENSOR_PER_PSU) ) ? PSU1_ID : PSU2_ID;
+        /* Get power good status */
+        if (psu_status_info_get(psu_id, "psu_power_good", &val) == ONLP_STATUS_OK) {
+            if(val != PSU_STATUS_POWER_GOOD) {
+                info->status |= ONLP_THERMAL_STATUS_FAILED;
+            }
+        }
     }
 
     return onlp_file_read_int(&info->mcelsius, devfiles__[tid]);							

@@ -241,7 +241,8 @@ int onlp_thermali_init(void)
  */
 int onlp_thermali_info_get(onlp_oid_t id, onlp_thermal_info_t* info)
 {
-	int   tid;
+    int   tid, psu_id;
+    int   val = 0;
 	VALIDATE(id);
     	int coretemp_max = 0, coretemp_temp = 0;
 	
@@ -264,6 +265,16 @@ int onlp_thermali_info_get(onlp_oid_t id, onlp_thermal_info_t* info)
 
         	return ONLP_STATUS_OK;
 	}
+
+    if ((tid >= THERMAL_1_ON_PSU1) && (tid <= THERMAL_1_ON_PSU2)) {
+        psu_id = ( tid == THERMAL_1_ON_PSU1 ) ? PSU1_ID : PSU2_ID;
+        /* Get power good status */
+        if (onlp_file_read_int(&val, "%s""psu%d_power_good", PSU_SYSFS_PATH, psu_id) == ONLP_STATUS_OK) {
+            if(val != PSU_STATUS_POWER_GOOD) {
+                info->status |= ONLP_THERMAL_STATUS_FAILED;
+            }
+        }
+    }
 
 	return onlp_file_read_int(&info->mcelsius, ipmi_devfiles__[tid]);		    
 }
