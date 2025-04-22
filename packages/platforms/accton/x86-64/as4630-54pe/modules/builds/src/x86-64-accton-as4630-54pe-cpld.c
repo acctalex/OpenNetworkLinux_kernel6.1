@@ -42,6 +42,14 @@
 #define FAN_MAX_DUTY_CYCLE              100
 #define FAN_REG_VAL_TO_SPEED_RPM_STEP   114 // R.P.M value = read value x3.79*60/2
 
+/* CPLD */
+#define CPLD_MAJOR_VER_REG	(0x01)
+#define CPLD_MINOR_VER_REG	(0x02)
+
+/* CPU CPLD */
+#define CPU_CPLD_MAJOR_VER_REG	(0x01)
+#define CPU_CPLD_MINOR_VER_REG	(0x02)
+
 static LIST_HEAD(cpld_client_list);
 static struct mutex     list_lock;
 
@@ -51,8 +59,10 @@ struct cpld_client_node {
 };
 
 enum cpld_type {
-    as4630_54pe_cpld,
+	as4630_54pe_cpld,
+	as4630_54pe_cpucpld,
 };
+
 enum fan_id {
     FAN1_ID,
     FAN2_ID,
@@ -81,8 +91,9 @@ struct as4630_54pe_cpld_data {
 
 
 static const struct i2c_device_id as4630_54pe_cpld_id[] = {
-    { "as4630_54pe_cpld", as4630_54pe_cpld},
-    { }
+	{ "as4630_54pe_cpld", as4630_54pe_cpld},
+	{ "as4630_54pe_cpucpld", as4630_54pe_cpucpld},
+	{ }
 };
 MODULE_DEVICE_TABLE(i2c, as4630_54pe_cpld_id);
 
@@ -99,6 +110,7 @@ MODULE_DEVICE_TABLE(i2c, as4630_54pe_cpld_id);
 
 enum as4630_54pe_cpld_sysfs_attributes {
 	CPLD_VERSION,
+	CPLD_MINOR_VERSION,
 	ACCESS,
 	/* transceiver attributes */
 	TRANSCEIVER_RXLOS_ATTR_ID(49),
@@ -171,7 +183,7 @@ static ssize_t set_duty_cycle(struct device *dev, struct device_attribute *da,
 	&sensor_dev_attr_module_tx_disable_##index.dev_attr.attr, \
 	&sensor_dev_attr_module_rx_los_##index.dev_attr.attr,     \
 	&sensor_dev_attr_module_tx_fault_##index.dev_attr.attr
-	
+
 #define DECLARE_QSFP_TRANSCEIVER_SENSOR_DEVICE_ATTR(index) \
     static SENSOR_DEVICE_ATTR(module_lpmode_##index, S_IRUGO | S_IWUSR, show_status, set_qsfp, MODULE_LPMODE_##index); \
     static SENSOR_DEVICE_ATTR(module_reset_##index, S_IRUGO | S_IWUSR, show_status, set_qsfp, MODULE_RESET_##index); \
@@ -199,8 +211,8 @@ static ssize_t set_duty_cycle(struct device *dev, struct device_attribute *da,
     static SENSOR_DEVICE_ATTR(fan_duty_cycle_percentage, S_IWUSR | S_IRUGO, fan_show_value, set_duty_cycle, FAN_DUTY_CYCLE_PERCENTAGE);
 #define DECLARE_FAN_DUTY_CYCLE_ATTR(index) &sensor_dev_attr_fan_duty_cycle_percentage.dev_attr.attr
 
-                                          
 static SENSOR_DEVICE_ATTR(version, S_IRUGO, show_version, NULL, CPLD_VERSION);
+static SENSOR_DEVICE_ATTR(minor_version, S_IRUGO, show_version, NULL, CPLD_MINOR_VERSION);
 static SENSOR_DEVICE_ATTR(access, S_IWUSR, NULL, access, ACCESS);
 
 
@@ -219,8 +231,9 @@ DECLARE_FAN_SENSOR_DEV_ATTR(3);
 DECLARE_FAN_DUTY_CYCLE_SENSOR_DEV_ATTR(1);
 
 static struct attribute *as4630_54pe_cpld_attributes[] = {
-    &sensor_dev_attr_version.dev_attr.attr,
-    &sensor_dev_attr_access.dev_attr.attr,
+	&sensor_dev_attr_version.dev_attr.attr,
+	&sensor_dev_attr_minor_version.dev_attr.attr,
+	&sensor_dev_attr_access.dev_attr.attr,
 	DECLARE_SFP_TRANSCEIVER_ATTR(49),
 	DECLARE_SFP_TRANSCEIVER_ATTR(50),
 	DECLARE_SFP_TRANSCEIVER_ATTR(51),
@@ -228,9 +241,16 @@ static struct attribute *as4630_54pe_cpld_attributes[] = {
 	DECLARE_QSFP_TRANSCEIVER_ATTR(53),
 	DECLARE_QSFP_TRANSCEIVER_ATTR(54),
 	DECLARE_FAN_ATTR(1),
-    DECLARE_FAN_ATTR(2),
-    DECLARE_FAN_ATTR(3),
+	DECLARE_FAN_ATTR(2),
+	DECLARE_FAN_ATTR(3),
 	DECLARE_FAN_DUTY_CYCLE_ATTR(1),
+	NULL
+};
+
+static struct attribute *as4630_54pe_cpucpld_attributes[] = {
+	&sensor_dev_attr_version.dev_attr.attr,
+	&sensor_dev_attr_minor_version.dev_attr.attr,
+	&sensor_dev_attr_access.dev_attr.attr,
 	NULL
 };
 
@@ -238,6 +258,9 @@ static const struct attribute_group as4630_54pe_cpld_group = {
 	.attrs = as4630_54pe_cpld_attributes,
 };
 
+static const struct attribute_group as4630_54pe_cpucpld_group = {
+	.attrs = as4630_54pe_cpucpld_attributes,
+};
 
 static ssize_t show_status(struct device *dev, struct device_attribute *da,
              char *buf)
@@ -247,7 +270,7 @@ static ssize_t show_status(struct device *dev, struct device_attribute *da,
     struct as4630_54pe_cpld_data *data = i2c_get_clientdata(client);
     int status = 0;
     u8 reg = 0, mask = 0, revert = 0;
-    
+
     switch (attr->index)
     {
         case MODULE_RXLOS_49 ... MODULE_RXLOS_50:
@@ -266,7 +289,7 @@ static ssize_t show_status(struct device *dev, struct device_attribute *da,
             reg=0x5;
             mask=0x1 << (attr->index==MODULE_TXDISABLE_49?7:3);
             break;
-            
+
         case MODULE_RXLOS_51 ... MODULE_RXLOS_52:
             reg=0x6;
             mask = 0x1<< (attr->index==MODULE_RXLOS_51?4:0);
@@ -274,11 +297,11 @@ static ssize_t show_status(struct device *dev, struct device_attribute *da,
         case MODULE_TXFAULT_51 ... MODULE_TXFAULT_52:
             reg=0x6;
             mask=0x1 << (attr->index==MODULE_TXFAULT_51?5:1);
-            break;           
+            break;
         case MODULE_PRESENT_51 ... MODULE_PRESENT_52:            
             reg=0x6;
             mask=0x1 << (attr->index==MODULE_PRESENT_51?6:2);
-            break;       
+            break;
         case MODULE_TXDISABLE_51 ... MODULE_TXDISABLE_52:
             reg=0x6;
             mask=0x1 << (attr->index==MODULE_TXDISABLE_51?7:3);
@@ -384,7 +407,7 @@ static ssize_t set_tx_disable(struct device *dev, struct device_attribute *da,
 	long disable;
 	int status;
     u8 reg = 0, mask = 0;
-     
+
 	status = kstrtol(buf, 10, &disable);
 	if (status) {
 		return status;
@@ -399,7 +422,7 @@ static ssize_t set_tx_disable(struct device *dev, struct device_attribute *da,
             reg=0x6;
             mask=0x1 << (attr->index==MODULE_TXDISABLE_51?7:3);
             break;
-     
+
 	    default:
 		    return 0;
     }
@@ -421,7 +444,7 @@ static ssize_t set_tx_disable(struct device *dev, struct device_attribute *da,
 	if (unlikely(status < 0)) {
 		goto exit;
 	}
-    
+
     mutex_unlock(&data->update_lock);
     return count;
 
@@ -437,7 +460,7 @@ static ssize_t access(struct device *dev, struct device_attribute *da,
 	u32 addr, val;
     struct i2c_client *client = to_i2c_client(dev);
     struct as4630_54pe_cpld_data *data = i2c_get_clientdata(client);
-    
+
 	if (sscanf(buf, "0x%x 0x%x", &addr, &val) != 2) {
 		return -EINVAL;
 	}
@@ -501,18 +524,47 @@ static void as4630_54pe_cpld_remove_client(struct i2c_client *client)
 	mutex_unlock(&list_lock);
 }
 
-static ssize_t show_version(struct device *dev, struct device_attribute *attr, char *buf)
+static ssize_t show_version(struct device *dev, struct device_attribute *da, char *buf)
 {
-    int val = 0;
-    struct i2c_client *client = to_i2c_client(dev);
-	
-	val = i2c_smbus_read_byte_data(client, 0x1);
+	struct i2c_client *client = to_i2c_client(dev);
+	struct as4630_54pe_cpld_data *data = i2c_get_clientdata(client);
+	struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
+	int reg = 0, reg_major = 0, reg_minor = 0;
+	int val;
 
-    if (val < 0) {
-        dev_dbg(&client->dev, "cpld(0x%x) reg(0x1) err %d\n", client->addr, val);
-    }
-	
-    return sprintf(buf, "%d\n", val);
+	switch (data->type) {
+	case as4630_54pe_cpld:
+		reg_major = CPLD_MAJOR_VER_REG;
+		reg_minor = CPLD_MINOR_VER_REG;
+		break;
+	case as4630_54pe_cpucpld:
+		reg_major = CPU_CPLD_MAJOR_VER_REG;
+		reg_minor = CPU_CPLD_MINOR_VER_REG;
+		break;
+	default:
+		break;
+	}
+
+	switch (attr->index) {
+	case CPLD_VERSION:
+		reg = reg_major;
+		break;
+	case CPLD_MINOR_VERSION:
+		reg = reg_minor;
+		break;
+	default:
+		break;
+	}
+
+	val = i2c_smbus_read_byte_data(client, reg);
+
+	if (val < 0) {
+		dev_dbg(&client->dev, "cpld(0x%02x) reg(0x%02x) err %d\n",
+			client->addr, reg, val);
+		return val;
+	}
+
+	return sprintf(buf, "%d\n", val);
 }
 
 /* fan utility functions
@@ -545,7 +597,7 @@ static ssize_t set_duty_cycle(struct device *dev, struct device_attribute *da,
 
     if (value < 0 || value > FAN_MAX_DUTY_CYCLE)
         return -EINVAL;
-    
+
     as4630_54pe_cpld_write_internal(client, fan_reg[1], duty_cycle_to_reg_val(value));
     as4630_54pe_cpld_write_internal(client, fan_reg[2], duty_cycle_to_reg_val(value));
     return count;
@@ -572,7 +624,7 @@ static u8 reg_val_to_is_present(u8 reg_val, enum fan_id id)
 static u8 is_fan_fault(struct as4630_54pe_cpld_data *data, enum fan_id id)
 {
     u8 ret = 1;
-    
+
     if(id > FAN3_ID)
         return 1;
     /* Check if the speed of front or rear fan is ZERO,
@@ -593,7 +645,7 @@ static ssize_t fan_show_value(struct device *dev, struct device_attribute *da,
     struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
     struct as4630_54pe_cpld_data *data = as4630_54pe_fan_update_device(dev);
     ssize_t ret = 0;
-    
+
     if (data->valid) {
         switch (attr->index)
         {
@@ -680,7 +732,7 @@ static int as4630_54pe_cpld_probe(struct i2c_client *client,
 	struct i2c_adapter *adap = to_i2c_adapter(client->dev.parent);
 	struct as4630_54pe_cpld_data *data;
 	int ret = -ENODEV;
-	
+
 	const struct attribute_group *group = NULL;
 
 	if (!i2c_check_functionality(adap, I2C_FUNC_SMBUS_BYTE))
@@ -695,12 +747,15 @@ static int as4630_54pe_cpld_probe(struct i2c_client *client,
 	i2c_set_clientdata(client, data);
     mutex_init(&data->update_lock);
 	data->type = id->driver_data;
-	   
+
     /* Register sysfs hooks */
     switch (data->type)
     {    
         case as4630_54pe_cpld:
             group = &as4630_54pe_cpld_group;
+            break;    
+        case as4630_54pe_cpucpld:
+            group = &as4630_54pe_cpucpld_group;
             break;    
         default:
             break;
@@ -736,6 +791,9 @@ static void as4630_54pe_cpld_remove(struct i2c_client *client)
         case as4630_54pe_cpld:
             group = &as4630_54pe_cpld_group;
             break;
+        case as4630_54pe_cpucpld:
+            group = &as4630_54pe_cpucpld_group;
+            break;
         default:
             break;
     }
@@ -768,7 +826,7 @@ static int as4630_54pe_cpld_read_internal(struct i2c_client *client, u8 reg)
 static int as4630_54pe_cpld_write_internal(struct i2c_client *client, u8 reg, u8 value)
 {
 	int status = 0, retry = I2C_RW_RETRY_COUNT;
-    
+
 	while (retry) {
 		status = i2c_smbus_write_byte_data(client, reg, value);
 		if (unlikely(status < 0)) {
