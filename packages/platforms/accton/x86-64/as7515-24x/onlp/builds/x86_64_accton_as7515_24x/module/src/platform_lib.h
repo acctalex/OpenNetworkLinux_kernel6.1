@@ -37,6 +37,9 @@
 #define PSU1_ID 1
 #define PSU2_ID 2
 
+#define PSU_STATUS_PRESENT 1
+#define PSU_STATUS_POWER_GOOD 1
+
 #define PSU1_EEPROM_SYSFS_FORMAT "/sys/bus/i2c/devices/%d-0052"
 #define PSU2_EEPROM_SYSFS_FORMAT "/sys/bus/i2c/devices/%d-0050"
 #define PSU1_PMBUS_SYSFS_FORMAT "/sys/bus/i2c/devices/%d-005a"
