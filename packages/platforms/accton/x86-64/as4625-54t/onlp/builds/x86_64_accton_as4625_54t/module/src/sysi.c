@@ -33,7 +33,8 @@
 #include "x86_64_accton_as4625_54t_int.h"
 #include "x86_64_accton_as4625_54t_log.h"
 
-#define PREFIX_PATH_ON_CPLD_DEV "/sys/bus/i2c/devices/0-0064/"
+#define BIOS_VER_PATH "/sys/devices/virtual/dmi/id/bios_version"
+#define PREFIX_PATH_ON_CPLD_DEV "/sys/bus/i2c/devices/1-0064/"
 
 #define NUM_OF_CPLD 1
 #define FAN_DUTY_CYCLE_MAX (100)
@@ -109,6 +110,11 @@ int
 onlp_sysi_platform_info_get(onlp_platform_info_t* pi)
 {
 	int ver_major = 0, ver_minor = 0;
+    onlp_onie_info_t onie;
+    char *bios_ver = NULL;
+
+    onlp_file_read_str(&bios_ver, BIOS_VER_PATH);
+    onlp_onie_decode_file(&onie, IDPROM_PATH);
 
 	if(onlp_file_read_int(&ver_major, "%s/version_major", PREFIX_PATH_ON_CPLD_DEV) < 0)
 		return ONLP_STATUS_E_INTERNAL;
@@ -116,7 +122,13 @@ onlp_sysi_platform_info_get(onlp_platform_info_t* pi)
 	if(onlp_file_read_int(&ver_minor, "%s/version_minor", PREFIX_PATH_ON_CPLD_DEV) < 0)
 		return ONLP_STATUS_E_INTERNAL;
 
-	pi->cpld_versions = aim_fstrdup("\r\nCPLD ver: %.2d.%.2d", ver_major, ver_minor);
+    pi->cpld_versions = aim_fstrdup("\r\n\t   Main CPLD(0x64): %02X.%02X\r\n",
+                                    ver_major, ver_minor);
+
+    pi->other_versions = aim_fstrdup("\r\n\t   BIOS: %s\r\n\t   ONIE: %s",
+                                    bios_ver, onie.onie_version);
+
+    AIM_FREE_IF_PTR(bios_ver);
 
 	return 0;
 }
@@ -125,6 +137,7 @@ void
 onlp_sysi_platform_info_free(onlp_platform_info_t* pi)
 {
 	aim_free(pi->cpld_versions);
+	aim_free(pi->other_versions);
 }
 
 int get_pcb_id()
