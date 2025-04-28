@@ -60,6 +60,7 @@ onlp_psui_info_get(onlp_oid_t id, onlp_psu_info_t* info)
     int ret   = ONLP_STATUS_OK;
     int pid = ONLP_OID_ID_GET(id);
     int thermal_count = 0;
+    psu_type_t psu_type = 0;
     VALIDATE(id);
 
     memset(info, 0, sizeof(onlp_psu_info_t));
@@ -78,10 +79,6 @@ onlp_psui_info_get(onlp_oid_t id, onlp_psu_info_t* info)
         return ONLP_STATUS_OK;
     }
     info->status |= ONLP_PSU_STATUS_PRESENT;
-
-    /* Set capability
-     */
-    info->caps = ONLP_PSU_CAPS_AC;
 
     /* Set the associated oid_table */
     thermal_count = CHASSIS_THERMAL_COUNT;
@@ -107,6 +104,20 @@ onlp_psui_info_get(onlp_oid_t id, onlp_psu_info_t* info)
         info->mpout = 0;
     }
     else {
+        /* Set capability */
+        psu_type = get_psu_type(pid, info->model, sizeof(info->model));
+        switch (psu_type) {
+            case PSU_TYPE_SPAACTN_03:
+                info->caps = ONLP_PSU_CAPS_AC;
+                break;
+            case PSU_TYPE_CRXT_T0T12:
+                info->caps = ONLP_PSU_CAPS_DC12;
+                break;
+            default:
+                info->caps = 0;
+                break;
+        }
+
         /* Read voltage, current and power */
         val = 0;
         ret = psu_pmbus_info_get(pid, "psu_v_in", &val);
@@ -151,7 +162,7 @@ onlp_psui_info_get(onlp_oid_t id, onlp_psu_info_t* info)
         }
     }
 
-    psu_eeprom_str_get(pid, info->model, sizeof(info->model), "psu_model_name");
+    /*PMBus no support serial_number*/
     psu_eeprom_str_get(pid, info->serial, sizeof(info->serial), "psu_serial_numer");
 
     return ONLP_STATUS_OK;
