@@ -32,7 +32,8 @@ class OnlPlatform_x86_64_accton_as4630_54pe_r0(OnlPlatformAccton,
             ('pca9548', 0x71, 2),
             ('pca9548', 0x70, 3),
             #initiate CPLD  
-            ('as4630_54pe_cpld', 0x60, 3)
+            ('as4630_54pe_cpld', 0x60, 3),
+            ('as4630_54pe_cpucpld', 0x65, 1+bus_offset)
             ])
         self.new_i2c_devices([
             # inititate LM77
