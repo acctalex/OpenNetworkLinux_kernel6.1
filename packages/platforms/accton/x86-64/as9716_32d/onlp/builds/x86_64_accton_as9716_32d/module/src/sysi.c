@@ -167,6 +167,7 @@ void
 onlp_sysi_platform_info_free(onlp_platform_info_t* pi)
 {
     aim_free(pi->cpld_versions);
+    aim_free(pi->other_versions);
 }
 
 /*Read fanN_direction=1: The air flow of Fan6 is ¡§AFI-Back to Front¡¨
