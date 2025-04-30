@@ -37,6 +37,9 @@
 #define PSU1_ID 1
 #define PSU2_ID 2
 
+#define PSU_STATUS_PRESENT     1
+#define PSU_STATUS_POWER_GOOD  1
+
 #define PSU_SYSFS_PATH "/sys/devices/platform/as7926_40xfb_psu/"
 #define FAN_BOARD_PATH "/sys/devices/platform/as7926_40xfb_fan/"
 #define IDPROM_PATH "/sys/devices/platform/as7926_40xfb_sys/eeprom"

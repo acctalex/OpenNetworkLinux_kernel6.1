@@ -27,9 +27,6 @@
 #include <onlplib/file.h>
 #include "platform_lib.h"
 
-#define PSU_STATUS_PRESENT     1
-#define PSU_STATUS_POWER_GOOD  1
-
 #define VALIDATE(_id)                           \
     do {                                        \
         if(!ONLP_OID_IS_PSU(_id)) {             \
@@ -134,15 +131,8 @@ onlp_psui_info_get(onlp_oid_t id, onlp_psu_info_t* info)
     }
 
     /* Set the associated oid_table */
-    val = 0;
-    if (onlp_file_read_int(&val, "%s""psu%d_fan1_input", PSU_SYSFS_PATH, pid) == 0 && val) {
-        info->hdr.coids[0] = ONLP_FAN_ID_CREATE(pid + CHASSIS_FAN_COUNT);
-    }
-
-    val = 0;
-    if (onlp_file_read_int(&val, "%s""psu%d_temp1_input", PSU_SYSFS_PATH, pid) == 0 && val) {
-        info->hdr.coids[1] = ONLP_THERMAL_ID_CREATE(pid + CHASSIS_THERMAL_COUNT);
-    }
+    info->hdr.coids[0] = ONLP_FAN_ID_CREATE(pid + CHASSIS_FAN_COUNT);
+    info->hdr.coids[1] = ONLP_THERMAL_ID_CREATE(pid + CHASSIS_THERMAL_COUNT);
 
     /* Read model */
     char *string = NULL;
