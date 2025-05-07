@@ -80,3 +80,25 @@ int get_psu_eeprom_str(int id, char *data_buf, int data_len, char *data_name)
     AIM_FREE_IF_PTR(str);
     return ONLP_STATUS_OK;
 }
+
+int get_i2c_bus_offset(int *bus_offset)
+{
+    int len = 0;
+    char *i2c_bus_0_name = NULL;
+
+    len = onlp_file_read_str(&i2c_bus_0_name, "/sys/bus/i2c/devices/i2c-0/name");
+
+    if(i2c_bus_0_name == NULL || len <= 0){
+        AIM_LOG_ERROR("Unable to read the name sysfs of i2c-0\r\n");
+        AIM_FREE_IF_PTR(i2c_bus_0_name);
+        return ONLP_STATUS_E_INTERNAL;
+    }
+
+    *bus_offset = 0;
+    if(!strncmp(i2c_bus_0_name, "SMBus iSMT", strlen("SMBus iSMT"))){
+        *bus_offset = -1;
+    }
+
+    AIM_FREE_IF_PTR(i2c_bus_0_name);
+    return ONLP_STATUS_OK;
+}

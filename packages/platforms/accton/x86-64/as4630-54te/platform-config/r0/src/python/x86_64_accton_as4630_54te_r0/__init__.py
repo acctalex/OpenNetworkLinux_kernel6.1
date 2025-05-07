@@ -29,6 +29,7 @@ class OnlPlatform_x86_64_accton_as4630_54te_r0(OnlPlatformAccton,
             ('pca9548', 0x71, 2),
             ('pca9548', 0x70, 3),
             #initiate CPLD
+            ('as4630_54te_cpucpld', 0x65, 1+bus_offset),
             ('as4630_54te_cpld', 0x60, 3)
             ])
 

@@ -51,7 +51,8 @@ struct cpld_client_node {
 };
 
 enum cpld_type {
-	as4630_54te_cpld
+	as4630_54te_cpld,
+	as4630_54te_cpucpld
 };
 
 enum fan_id {
@@ -81,6 +82,8 @@ struct as4630_54te_cpld_data {
 
 static const struct i2c_device_id as4630_54te_cpld_id[] = {
 	{ "as4630_54te_cpld", as4630_54te_cpld },
+	/* Note the name length, do not over 20(name length 19 + end char */
+	{ "as4630_54te_cpucpld", as4630_54te_cpucpld },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, as4630_54te_cpld_id);
@@ -98,7 +101,8 @@ MODULE_DEVICE_TABLE(i2c, as4630_54te_cpld_id);
 #define FAN_FAULT_ATTR_ID(index) FAN_FAULT_##index
 
 enum as4630_54te_cpld_sysfs_attributes {
-	CPLD_VERSION,
+	MAJOR_VERSION,
+	MINOR_VERSION,
 	ACCESS,
 	/* transceiver attributes */
 	MODULE_PRESENT_ALL,
@@ -224,7 +228,8 @@ static SENSOR_DEVICE_ATTR(module_rx_los_all, S_IRUGO, show_rxlos_all, \
 #define DECLARE_FAN_DUTY_CYCLE_ATTR(index) \
 	&sensor_dev_attr_fan_duty_cycle_percentage.dev_attr.attr
 
-static SENSOR_DEVICE_ATTR(version, S_IRUGO, show_version, NULL, CPLD_VERSION);
+static SENSOR_DEVICE_ATTR(major_version, S_IRUGO, show_version, NULL, MAJOR_VERSION);
+static SENSOR_DEVICE_ATTR(minor_version, S_IRUGO, show_version, NULL, MINOR_VERSION);
 static SENSOR_DEVICE_ATTR(access, S_IWUSR, NULL, access, ACCESS);
 
 /* transceiver attributes */
@@ -242,7 +247,8 @@ DECLARE_FAN_SENSOR_DEV_ATTR(3);
 DECLARE_FAN_DUTY_CYCLE_SENSOR_DEV_ATTR(1);
 
 static struct attribute *as4630_54te_cpld_attributes[] = {
-	&sensor_dev_attr_version.dev_attr.attr,
+	&sensor_dev_attr_major_version.dev_attr.attr,
+	&sensor_dev_attr_minor_version.dev_attr.attr,
 	&sensor_dev_attr_access.dev_attr.attr,
 	&sensor_dev_attr_module_present_all.dev_attr.attr,
 	&sensor_dev_attr_module_rx_los_all.dev_attr.attr,
@@ -259,8 +265,19 @@ static struct attribute *as4630_54te_cpld_attributes[] = {
 	NULL
 };
 
+static struct attribute *as4630_54te_cpucpld_attributes[] = {
+    &sensor_dev_attr_major_version.dev_attr.attr,
+    &sensor_dev_attr_minor_version.dev_attr.attr,
+    &sensor_dev_attr_access.dev_attr.attr,
+    NULL
+};
+
 static const struct attribute_group as4630_54te_cpld_group = {
 	.attrs = as4630_54te_cpld_attributes,
+};
+
+static const struct attribute_group as4630_54te_cpucpld_group = {
+    .attrs = as4630_54te_cpucpld_attributes,
 };
 
 static ssize_t show_present_all(struct device *dev, struct device_attribute *da,
@@ -551,13 +568,27 @@ static void as4630_54te_cpld_remove_client(struct i2c_client *client)
 	mutex_unlock(&list_lock);
 }
 
-static ssize_t show_version(struct device *dev, struct device_attribute *attr,
+static ssize_t show_version(struct device *dev, struct device_attribute *da,
 						char *buf)
 {
 	int val = 0;
 	struct i2c_client *client = to_i2c_client(dev);
+	struct as4630_54te_cpld_data *data = i2c_get_clientdata(client);
+	struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
+	int reg = 0, reg_major = 0x1, reg_minor = 0x2;
 
-	val = i2c_smbus_read_byte_data(client, 0x1);
+	switch (attr->index) {
+	case MAJOR_VERSION:
+		reg = reg_major;
+		break;
+	case MINOR_VERSION:
+		reg = reg_minor;
+		break;
+	default:
+		break;
+	}
+
+	val = i2c_smbus_read_byte_data(client, reg);
 
 	if (val < 0) {
 		dev_dbg(&client->dev, "cpld(0x%x) reg(0x1) err %d\n",
@@ -743,6 +774,7 @@ static int as4630_54te_cpld_probe(struct i2c_client *client,
 	struct i2c_adapter *adap = to_i2c_adapter(client->dev.parent);
 	struct as4630_54te_cpld_data *data;
 	int ret = -ENODEV;
+    const struct attribute_group *group = NULL;
 
 	if (!i2c_check_functionality(adap, I2C_FUNC_SMBUS_BYTE))
 		goto exit;
@@ -757,10 +789,24 @@ static int as4630_54te_cpld_probe(struct i2c_client *client,
 	mutex_init(&data->update_lock);
 	data->type = id->driver_data;
 
-	/* Register sysfs hooks */
-	ret = sysfs_create_group(&client->dev.kobj, &as4630_54te_cpld_group);
-	if (ret)
-		goto exit_free;
+    /* Register sysfs hooks */
+    switch (data->type) {
+        case as4630_54te_cpld:
+            group = &as4630_54te_cpld_group;
+            break;
+        case as4630_54te_cpucpld:
+            group = &as4630_54te_cpucpld_group;
+            break;
+        default:
+            break;
+    }
+
+    if (group) {
+        ret = sysfs_create_group(&client->dev.kobj, group);
+        if (ret) {
+            goto exit_free;
+        }
+    }
 
 	as4630_54te_cpld_add_client(client);
 	return 0;
@@ -773,12 +819,26 @@ exit:
 
 static void as4630_54te_cpld_remove(struct i2c_client *client)
 {
+    const struct attribute_group *group = NULL;
 	struct as4630_54te_cpld_data *data = i2c_get_clientdata(client);
 
 	as4630_54te_cpld_remove_client(client);
 
-	/* Remove sysfs hooks */
-	sysfs_remove_group(&client->dev.kobj, &as4630_54te_cpld_group);
+    /* Remove sysfs hooks */
+    switch (data->type) {
+        case as4630_54te_cpld:
+            group = &as4630_54te_cpld_group;
+            break;
+        case as4630_54te_cpucpld:
+            group = &as4630_54te_cpucpld_group;
+            break;
+        default:
+            break;
+    }
+
+    if (group) {
+        sysfs_remove_group(&client->dev.kobj, group);
+    }
 
 	kfree(data);
 }
