@@ -33,12 +33,18 @@
 #include "x86_64_accton_as4630_54te_int.h"
 #include "x86_64_accton_as4630_54te_log.h"
 
-#define PREFIX_PATH_ON_CPLD_DEV "/sys/bus/i2c/devices/3-0060/"
-
-#define NUM_OF_CPLD 3
+#define BIOS_VER_PATH "/sys/devices/virtual/dmi/id/bios_version"
+#define NUM_OF_CPLD_VER 4
 #define FAN_DUTY_CYCLE_MAX (100)
 /* Note, all chassis fans share 1 single duty setting.
  * Here use fan 1 to represent global fan duty value.*/
+
+static char* cpld_ver_path[NUM_OF_CPLD_VER] = {
+    "/sys/bus/i2c/devices/%d-0065/major_version",
+    "/sys/bus/i2c/devices/%d-0065/minor_version",
+    "/sys/bus/i2c/devices/3-0060/major_version",
+    "/sys/bus/i2c/devices/3-0060/minor_version",
+};
 
 const char*
 onlp_sysi_platform_get(void)
@@ -102,12 +108,38 @@ onlp_sysi_oids_get(onlp_oid_t* table, int max)
 int
 onlp_sysi_platform_info_get(onlp_platform_info_t* pi)
 {
-    int ver=0;
+    int i, v[NUM_OF_CPLD_VER] = {0};
+    int bus_offset = 0;
+    char path[64];
+    onlp_onie_info_t onie;
+    char *bios_ver = NULL;
 
-    if(onlp_file_read_int(&ver, "%s/version", PREFIX_PATH_ON_CPLD_DEV) < 0)
-        return ONLP_STATUS_E_INTERNAL;
+    get_i2c_bus_offset(&bus_offset);
 
-    pi->cpld_versions = aim_fstrdup("%d", ver);
+    for (i = 0; i < AIM_ARRAYSIZE(cpld_ver_path); i++) {
+        v[i] = 0;
+
+        if (i == 0 || i == 1)
+            onlp_file_read_int(v+i, cpld_ver_path[i], 1+bus_offset);
+
+        if (i == 2 || i == 3)
+            onlp_file_read_int(v+i, cpld_ver_path[i]);
+    }
+    /* BIOS version */
+    onlp_file_read_str(&bios_ver, BIOS_VER_PATH);
+    /* ONIE version */
+    snprintf(path, sizeof(path), IDPROM_PATH, 1+bus_offset);
+    onlp_onie_decode_file(&onie, path);
+
+    pi->cpld_versions = aim_fstrdup("\r\n\t   CPU CPLD(0x65): %02X.%02X"
+                                    "\r\n\t   Main CPLD(0x60): %02X.%02X"
+                                    , v[0], v[1], v[2], v[3]);
+
+    pi->other_versions = aim_fstrdup("\r\n\t   BIOS: %s\r\n\t   ONIE: %s",
+                                    bios_ver, onie.onie_version);
+
+    onlp_onie_info_free(&onie);
+    AIM_FREE_IF_PTR(bios_ver);
 
     return 0;
 }
@@ -116,6 +148,7 @@ void
 onlp_sysi_platform_info_free(onlp_platform_info_t* pi)
 {
     aim_free(pi->cpld_versions);
+    aim_free(pi->other_versions);
 }
 
 /* Temperature Policy

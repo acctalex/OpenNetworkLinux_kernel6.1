@@ -55,11 +55,13 @@
 #define CPLD_NODE_PATH    "/sys/bus/i2c/devices/i2c-3/3-0060/"
 #define FAN_NODE(node)    CPLD_NODE_PATH#node
 
+#define IDPROM_PATH   "/sys/bus/i2c/devices/%d-0057/eeprom"
 #define IDPROM_PATH_1 "/sys/bus/i2c/devices/0-0057/eeprom"
 #define IDPROM_PATH_2 "/sys/bus/i2c/devices/1-0057/eeprom"
 
 int psu_pmbus_info_get(int id, char *node, int *value);
 int psu_status_info_get(int id, char *node, int *value);
+int get_i2c_bus_offset(int *bus_offset);
 
 typedef enum psu_type {
     PSU_TYPE_UNKNOWN,
