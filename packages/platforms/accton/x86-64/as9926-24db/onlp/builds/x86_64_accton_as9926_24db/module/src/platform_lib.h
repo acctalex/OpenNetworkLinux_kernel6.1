@@ -69,5 +69,14 @@ enum onlp_thermal_id
 	#define DEBUG_PRINT(fmt, args...)
 #endif
 
+#define AIM_FREE_IF_PTR(p) \
+    do \
+    { \
+        if (p) { \
+            aim_free(p); \
+            p = NULL; \
+        } \
+    } while (0)
+
 #endif  /* __PLATFORM_LIB_H__ */
 
