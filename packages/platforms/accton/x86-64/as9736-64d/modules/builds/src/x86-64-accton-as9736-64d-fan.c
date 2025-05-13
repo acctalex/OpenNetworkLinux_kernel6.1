@@ -42,6 +42,8 @@ static ssize_t set_duty_cycle(struct device *dev, struct device_attribute *da,
 /* fan related data, the index should match sysfs_fan_attributes
  */
 static const u8 fan_reg[] = {
+    0x00,       /* board info */
+    0x01,       /* cpld major revision */
 	0x10,       /* fan 1-4 present status */
 	0x30,       /* fan1 duty cycle */
 	0x31,       /* fan2 duty cycle */
@@ -79,6 +81,8 @@ enum fan_id {
 };
 
 enum sysfs_fan_attributes {
+    FAN_BOARD_INFO_REG,
+    FAN_CPLD_REVISION_REG,
 	FAN_PRESENT_REG,
 	FAN1_SPEED_RPM = 5,
 	FAN2_SPEED_RPM,
@@ -113,6 +117,7 @@ enum sysfs_fan_attributes {
 	FAN6_DUTY_CYCLE_PERCENTAGE,
 	FAN7_DUTY_CYCLE_PERCENTAGE,
 	FAN8_DUTY_CYCLE_PERCENTAGE,
+	FAN_VERSION
 };
 
 /* Define attributes
@@ -154,6 +159,13 @@ enum sysfs_fan_attributes {
 
 #define DECLARE_FAN_SPEED_RPM_ATTR(index) \
 	&sensor_dev_attr_fan##index##_speed_rpm.dev_attr.attr
+
+/***********************************************************************
+ *                  Extend attributes
+ ***********************************************************************/
+static SENSOR_DEVICE_ATTR(version, S_IRUGO, fan_show_value, NULL, FAN_VERSION);
+static SENSOR_DEVICE_ATTR(board_info, S_IRUGO, fan_show_value, NULL, FAN_BOARD_INFO_REG);
+static SENSOR_DEVICE_ATTR(cpld_ver, S_IRUGO, fan_show_value, NULL, FAN_CPLD_REVISION_REG);
 
 /* 8 fan fault attributes in this platform */
 DECLARE_FAN_FAULT_SENSOR_DEV_ATTR(1);
@@ -197,6 +209,8 @@ DECLARE_FAN_DUTY_CYCLE_SENSOR_DEV_ATTR(8);
 
 static struct attribute *as9736_64d_fan_attributes[] = {
 	/* fan related attributes */
+    &sensor_dev_attr_board_info.dev_attr.attr,
+    &sensor_dev_attr_cpld_ver.dev_attr.attr,
 	DECLARE_FAN_FAULT_ATTR(1),
 	DECLARE_FAN_FAULT_ATTR(2),
 	DECLARE_FAN_FAULT_ATTR(3),
@@ -229,6 +243,7 @@ static struct attribute *as9736_64d_fan_attributes[] = {
 	DECLARE_FAN_DUTY_CYCLE_ATTR(6),
 	DECLARE_FAN_DUTY_CYCLE_ATTR(7),
 	DECLARE_FAN_DUTY_CYCLE_ATTR(8),
+    &sensor_dev_attr_version.dev_attr.attr,
 	NULL
 };
 
@@ -351,6 +366,15 @@ static ssize_t fan_show_value(struct device *dev, struct device_attribute *da,
 
 	if (data->valid) {
 		switch (attr->index) {
+		case FAN_VERSION:
+            ret = sprintf(buf, "%x.%x\n", (data->reg_val[FAN_CPLD_REVISION_REG]) & 0x7F, (data->reg_val[FAN_BOARD_INFO_REG]) & 0xFF);
+            break;
+        case FAN_BOARD_INFO_REG:
+            ret = sprintf(buf, "0x%x\n", (data->reg_val[FAN_BOARD_INFO_REG]) & 0xF);
+            break;
+        case FAN_CPLD_REVISION_REG:
+            ret = sprintf(buf, "0x%x\n", (data->reg_val[FAN_CPLD_REVISION_REG]) & 0xF);
+            break;
 		case FAN1_DUTY_CYCLE_PERCENTAGE:
 		case FAN2_DUTY_CYCLE_PERCENTAGE:
 		case FAN3_DUTY_CYCLE_PERCENTAGE:
