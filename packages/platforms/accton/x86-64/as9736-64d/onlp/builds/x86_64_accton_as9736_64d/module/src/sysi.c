@@ -41,21 +41,23 @@
 #define UDB_FPGA_VER_PATH "/sys/devices/platform/as9736_64d_fpga/udb_version"
 #define NUM_OF_FAN_ON_MAIN_BROAD    6
 #define PREFIX_PATH_ON_CPLD_DEV    "/sys/bus/i2c/devices/"
+
 #define NUM_OF_I2C_CPLD            4
 /* (SMB_LDB_UDB FPGA) = same version
    (UDB_LDB_CPLD1_2)  = same version ==> integrate into 2 CPLD*/
-#define NUM_OF_INTGR_PCIE_CPLD     2
-#define NUM_OF_CPLD                NUM_OF_I2C_CPLD + NUM_OF_INTGR_PCIE_CPLD
+#define NUM_OF_PCIE_CPLD           2
+#define NUM_OF_CPLD                NUM_OF_I2C_CPLD + NUM_OF_PCIE_CPLD
+
 #define FAN_DUTY_CYCLE_MAX         (100)
 #define FAN_DUTY_CYCLE_DEFAULT     (38)
 
 
 static char arr_cplddev_name[NUM_OF_I2C_CPLD][10] =
 {
-	"6-0060",   /*SYSTEM CPLD*/
+	"6-0060",    /*SMB CPLD*/
 	"25-0033",   /*FAN CPLD*/
-	"36-0060",   /*PSU CPLD*/
-	"51-0035"   /*SCM CPLD*/
+	"36-0060",   /*PDB CPLD*/
+	"51-0035"    /*SCM CPLD*/
 };
 
 const char* onlp_sysi_platform_get(void)
@@ -136,9 +138,9 @@ int onlp_sysi_platform_info_get(onlp_platform_info_t* pi)
         onie_version[13] = '\0';
     }
 
-    pi->cpld_versions = aim_fstrdup("\r\n\t   CPU CPLD: %s"
+    pi->cpld_versions = aim_fstrdup("\r\n\t   SMB CPLD: %s"
                                     "\r\n\t   FCM CPLD: %s"
-                                    "\r\n\t   PSU CPLD: %s"
+                                    "\r\n\t   PDB CPLD: %s"
                                     "\r\n\t   SCM CPLD: %s"
                                     "\r\n\t   UDB CPLD_1_2: %s"
                                     "\r\n\t   LDB CPLD_1_2: %s\r\n", v[0], v[1], v[2], v[3], v[4], v[4]);
