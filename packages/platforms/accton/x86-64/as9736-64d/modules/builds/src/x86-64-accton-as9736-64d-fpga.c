@@ -183,6 +183,10 @@ struct as9736_64d_fpga_data {
 	u32                       udb_version;
 	u32                       ldb_version;
 	u32                       smb_version;
+    u32                       udb_cpld1_version;
+    u32                       udb_cpld2_version;
+    u32                       ldb_cpld1_version;
+    u32                       ldb_cpld2_version;
 	unsigned long             last_updated;    /* In jiffies */
 };
 
@@ -535,6 +539,10 @@ enum fpga_sysfs_attributes {
 	PCIE_FPGA_UDB_VERSION,
 	PCIE_FPGA_LDB_VERSION,
 	PCIE_FPGA_SMB_VERSION,
+    PCIE_FPGA_UDB_CPLD1_VERSION,
+    PCIE_FPGA_UDB_CPLD2_VERSION,
+    PCIE_FPGA_LDB_CPLD1_VERSION,
+    PCIE_FPGA_LDB_CPLD2_VERSION,
 	MODULE_PRESENT_ALL,
 	MODULE_RXLOS_ALL,
 };
@@ -896,6 +904,10 @@ static SENSOR_DEVICE_ATTR(module_sfp_sgmii_66, S_IRUGO | S_IWUSR, sfp_sgmii_read
 static SENSOR_DEVICE_ATTR(udb_version, S_IRUGO, port_status_read, NULL, PCIE_FPGA_UDB_VERSION);
 static SENSOR_DEVICE_ATTR(ldb_version, S_IRUGO, port_status_read, NULL, PCIE_FPGA_LDB_VERSION);
 static SENSOR_DEVICE_ATTR(smb_version, S_IRUGO, port_status_read, NULL, PCIE_FPGA_SMB_VERSION);
+static SENSOR_DEVICE_ATTR(udb_cpld1_version, S_IRUGO, port_status_read, NULL, PCIE_FPGA_UDB_CPLD1_VERSION);
+static SENSOR_DEVICE_ATTR(udb_cpld2_version, S_IRUGO, port_status_read, NULL, PCIE_FPGA_UDB_CPLD2_VERSION);
+static SENSOR_DEVICE_ATTR(ldb_cpld1_version, S_IRUGO, port_status_read, NULL, PCIE_FPGA_LDB_CPLD1_VERSION);
+static SENSOR_DEVICE_ATTR(ldb_cpld2_version, S_IRUGO, port_status_read, NULL, PCIE_FPGA_LDB_CPLD2_VERSION);
 
 static SENSOR_DEVICE_ATTR(module_present_all, S_IRUGO, port_status_read, \
 			  NULL, MODULE_PRESENT_ALL);
@@ -980,6 +992,10 @@ static struct attribute *fpga_transceiver_attributes[] = {
 	&sensor_dev_attr_udb_version.dev_attr.attr,
 	&sensor_dev_attr_ldb_version.dev_attr.attr,
 	&sensor_dev_attr_smb_version.dev_attr.attr,
+    &sensor_dev_attr_udb_cpld1_version.dev_attr.attr,
+    &sensor_dev_attr_udb_cpld2_version.dev_attr.attr,
+    &sensor_dev_attr_ldb_cpld1_version.dev_attr.attr,
+    &sensor_dev_attr_ldb_cpld2_version.dev_attr.attr,
 	&sensor_dev_attr_module_present_all.dev_attr.attr,
 	&sensor_dev_attr_module_rx_los_all.dev_attr.attr,
 	NULL
@@ -1108,8 +1124,13 @@ static ssize_t fpga_read_port_status_value(struct bin_attribute *eeprom)
 
 	/*get version*/
 	fpga_ctl->udb_version = ioread32(fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_UDB].data_base_addr);
-	fpga_ctl->udb_version = ioread32(fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_LDB].data_base_addr);
-	fpga_ctl->udb_version = ioread32(fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_SMB].data_base_addr);
+	fpga_ctl->ldb_version = ioread32(fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_LDB].data_base_addr);
+	fpga_ctl->smb_version = ioread32(fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_SMB].data_base_addr);
+
+    fpga_ctl->udb_cpld1_version = ioread32(fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_UDB].data_base_addr + ASLPC_DEV_UDB_CPLD1_PCIE_START_OFFST);
+    fpga_ctl->udb_cpld2_version = ioread32(fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_UDB].data_base_addr + ASLPC_DEV_UDB_CPLD2_PCIE_START_OFFST);
+    fpga_ctl->ldb_cpld1_version = ioread32(fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_LDB].data_base_addr + ASLPC_DEV_LDB_CPLD1_PCIE_START_OFFST);
+    fpga_ctl->ldb_cpld2_version = ioread32(fpga_ctl->pci_fpga_dev[PCI_SUBSYSTEM_ID_LDB].data_base_addr + ASLPC_DEV_LDB_CPLD2_PCIE_START_OFFST);
 
 	fpga_ctl->last_updated = jiffies;
 
@@ -1361,22 +1382,34 @@ static ssize_t port_status_read(struct device *dev,
 		break;
 	case PCIE_FPGA_UDB_VERSION:
 		ret = sprintf(buf, 
-			"%d.%d\n", 
+			"%x.%x\n",
 			(fpga_ctl->udb_version>>8) & 0x7f,
 			fpga_ctl->udb_version & 0xff);
 		break;
 	case PCIE_FPGA_LDB_VERSION:
 		ret = sprintf(buf, 
-			"%d.%d\n", 
+			"%x.%x\n",
 			(fpga_ctl->ldb_version>>8) & 0x7f, 
 			fpga_ctl->ldb_version & 0xff);
 		break;
 	case PCIE_FPGA_SMB_VERSION:
 		ret = sprintf(buf, 
-			"%d.%d\n", 
+			"%x.%x\n",
 			(fpga_ctl->smb_version>>8) & 0x7f, 
 			fpga_ctl->smb_version & 0xff);
 		break;
+    case PCIE_FPGA_UDB_CPLD1_VERSION:
+        ret = sprintf(buf, "%x.%x\n", (fpga_ctl->udb_cpld1_version>>8) & 0x7f, fpga_ctl->udb_cpld1_version & 0xff);
+        break;
+    case PCIE_FPGA_UDB_CPLD2_VERSION:
+        ret = sprintf(buf, "%x.%x\n", (fpga_ctl->udb_cpld2_version>>8) & 0x7f, fpga_ctl->udb_cpld2_version & 0xff);
+        break;
+    case PCIE_FPGA_LDB_CPLD1_VERSION:
+        ret = sprintf(buf, "%x.%x\n", (fpga_ctl->ldb_cpld1_version>>8) & 0x7f, fpga_ctl->ldb_cpld1_version & 0xff);
+        break;
+    case PCIE_FPGA_LDB_CPLD2_VERSION:
+        ret = sprintf(buf, "%x.%x\n", (fpga_ctl->ldb_cpld2_version>>8) & 0x7f, fpga_ctl->ldb_cpld2_version & 0xff);
+        break;
 	default:
 		ret = -EINVAL;
 		break;

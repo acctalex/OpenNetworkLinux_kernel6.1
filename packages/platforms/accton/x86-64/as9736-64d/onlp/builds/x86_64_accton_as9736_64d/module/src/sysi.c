@@ -36,18 +36,28 @@
 #include "x86_64_accton_as9736_64d_int.h"
 #include "x86_64_accton_as9736_64d_log.h"
 
+#define BIOS_VER_PATH "/sys/devices/virtual/dmi/id/bios_version"
+#define UDB_CPLD_VER_PATH "/sys/devices/platform/as9736_64d_fpga/udb_cpld1_version"
+#define UDB_FPGA_VER_PATH "/sys/devices/platform/as9736_64d_fpga/udb_version"
 #define NUM_OF_FAN_ON_MAIN_BROAD    6
 #define PREFIX_PATH_ON_CPLD_DEV    "/sys/bus/i2c/devices/"
-#define NUM_OF_CPLD		   3
+
+#define NUM_OF_I2C_CPLD            4
+/* (SMB_LDB_UDB FPGA) = same version
+   (UDB_LDB_CPLD1_2)  = same version ==> integrate into 2 CPLD*/
+#define NUM_OF_PCIE_CPLD           2
+#define NUM_OF_CPLD                NUM_OF_I2C_CPLD + NUM_OF_PCIE_CPLD
+
 #define FAN_DUTY_CYCLE_MAX         (100)
 #define FAN_DUTY_CYCLE_DEFAULT     (38)
 
 
-static char arr_cplddev_name[NUM_OF_CPLD][10] =
+static char arr_cplddev_name[NUM_OF_I2C_CPLD][10] =
 {
-	"1-0060",
-	"10-0061",
-	"10-0062"
+	"6-0060",    /*SMB CPLD*/
+	"25-0033",   /*FAN CPLD*/
+	"36-0060",   /*PDB CPLD*/
+	"51-0035"    /*SCM CPLD*/
 };
 
 const char* onlp_sysi_platform_get(void)
@@ -98,20 +108,56 @@ int onlp_sysi_oids_get(onlp_oid_t* table, int max)
 
 int onlp_sysi_platform_info_get(onlp_platform_info_t* pi)
 {
-	int   i, v[NUM_OF_CPLD]={0};
+    int i = 0;
+    char result[40] = {0};
+    char    *v[NUM_OF_CPLD] = { NULL };
+    char *path[NUM_OF_CPLD] = { NULL, NULL, NULL, NULL, UDB_CPLD_VER_PATH, UDB_FPGA_VER_PATH };
+    char *bios_ver = NULL;
 
-	for (i = 0; i < NUM_OF_CPLD; i++) {
-		v[i] = 0;
+    char onie_version[15] = {0};
+    uint8_t* eeprom_data = NULL;
+    int size;
 
-		if (onlp_file_read_int(v+i, "%s%s/version", 
-				      PREFIX_PATH_ON_CPLD_DEV,
-				      arr_cplddev_name[i]) < 0) {
-			return ONLP_STATUS_E_INTERNAL;
-		}
-	}
-	pi->cpld_versions = aim_fstrdup("%d.%d.%d", v[0], v[1], v[2]);
+    for (i = 0; i < NUM_OF_CPLD ; i++) {
+        if( i < NUM_OF_I2C_CPLD ) {
+            memset(result, 0, sizeof(result));
+            sprintf(result, "%s%s%s", PREFIX_PATH_ON_CPLD_DEV, arr_cplddev_name[i], "/version");
+            path[i] = result;
+        }
+        onlp_file_read_str(&v[i], path[i]);
+    }
 
-	return 0;
+    onlp_file_read_str(&bios_ver, BIOS_VER_PATH);
+
+    onlp_sysi_onie_data_get(&eeprom_data, &size);
+
+    if (eeprom_data != NULL) {
+        for (i = 0x7f; i < 0x8c; i++) {
+            onie_version[i-0x7f] =  eeprom_data[i];
+        }
+        onie_version[13] = '\0';
+    }
+
+    pi->cpld_versions = aim_fstrdup("\r\n\t   SMB CPLD: %s"
+                                    "\r\n\t   FCM CPLD: %s"
+                                    "\r\n\t   PDB CPLD: %s"
+                                    "\r\n\t   SCM CPLD: %s"
+                                    "\r\n\t   UDB CPLD_1_2: %s"
+                                    "\r\n\t   LDB CPLD_1_2: %s\r\n", v[0], v[1], v[2], v[3], v[4], v[4]);
+
+    pi->other_versions = aim_fstrdup("\r\n\t   UDB FPGA: %s"
+                                     "\r\n\t   LDB FPGA: %s"
+                                     "\r\n\t   SMB FPGA: %s"
+                                     "\r\n\t   BIOS: %s"
+                                     "\r\n\t   ONIE: %s", v[5], v[5], v[5], bios_ver, onie_version);
+
+    for (i = 0; i <  AIM_ARRAYSIZE(v) ; i++) {
+        AIM_FREE_IF_PTR(v[i]);
+    }
+    AIM_FREE_IF_PTR(bios_ver);
+    AIM_FREE_IF_PTR(eeprom_data);
+
+    return 0;
 }
 
 void onlp_sysi_platform_info_free(onlp_platform_info_t* pi)

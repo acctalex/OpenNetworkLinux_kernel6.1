@@ -46,9 +46,10 @@ struct cpld_client_node {
 };
 
 enum cpld_type {
-	as9736_64d_sys_cpld,
-	as9736_64d_pdb_l_cpld,
-	as9736_64d_pdb_r_cpld,
+    as9736_64d_fpga,
+    as9736_64d_sys_cpld,
+    as9736_64d_pdb_cpld,
+    as9736_64d_scm_cpld
 };
 
 struct as9736_64d_cpld_data {
@@ -58,9 +59,10 @@ struct as9736_64d_cpld_data {
 };
 
 static const struct i2c_device_id as9736_64d_cpld_id[] = {
-	{ "as9736_64d_sys_cpld", as9736_64d_sys_cpld },
-	{ "as9736_64d_pdb_l_cpld", as9736_64d_pdb_l_cpld },
-	{ "as9736_64d_pdb_r_cpld", as9736_64d_pdb_r_cpld },
+    { "as9736_64d_fpga", as9736_64d_fpga },
+    { "as9736_64d_sys_cpld", as9736_64d_sys_cpld },
+    { "as9736_64d_pdb_cpld", as9736_64d_pdb_cpld },
+    { "as9736_64d_scm_cpld", as9736_64d_scm_cpld },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, as9736_64d_cpld_id);
@@ -83,14 +85,41 @@ static int as9736_64d_cpld_write_internal(struct i2c_client *client, u8 reg,
 static SENSOR_DEVICE_ATTR(version, S_IRUGO, show_version, NULL, CPLD_VERSION);
 static SENSOR_DEVICE_ATTR(access, S_IWUSR, NULL, access, ACCESS);
 
-static struct attribute *as9736_64d_cpld1_attributes[] = {
+static struct attribute *as9736_64d_fpga_attributes[] = {
 	&sensor_dev_attr_version.dev_attr.attr,
 	&sensor_dev_attr_access.dev_attr.attr,
 	NULL
 };
 
-static const struct attribute_group as9736_64d_cpld1_group = {
-	.attrs = as9736_64d_cpld1_attributes,
+static const struct attribute_group as9736_64d_fpga_group = {
+	.attrs = as9736_64d_fpga_attributes,
+};
+
+static struct attribute *as9736_64d_sys_cpld_attributes[] = {
+    &sensor_dev_attr_version.dev_attr.attr,
+    NULL
+};
+
+static struct attribute *as9736_64d_pdb_cpld_attributes[] = {
+    &sensor_dev_attr_version.dev_attr.attr,
+    NULL
+};
+
+static struct attribute *as9736_64d_scm_cpld_attributes[] = {
+    &sensor_dev_attr_version.dev_attr.attr,
+    NULL
+};
+
+static const struct attribute_group as9736_64d_sys_cpld_group = {
+    .attrs = as9736_64d_sys_cpld_attributes,
+};
+
+static const struct attribute_group as9736_64d_pdb_cpld_group = {
+    .attrs = as9736_64d_pdb_cpld_attributes,
+};
+
+static const struct attribute_group as9736_64d_scm_cpld_group = {
+    .attrs = as9736_64d_scm_cpld_attributes,
 };
 
 static ssize_t access(struct device *dev, struct device_attribute *da,
@@ -168,16 +197,20 @@ static void as9736_64d_cpld_remove_client(struct i2c_client *client)
 static ssize_t show_version(struct device *dev, struct device_attribute *attr,
 				char *buf)
 {
-	int val = 0;
+    int val_major = 0, val_minor = 0;
 	struct i2c_client *client = to_i2c_client(dev);
 	
-	val = i2c_smbus_read_byte_data(client, 0x1);
+    val_major = i2c_smbus_read_byte_data(client, 0x1);
+    val_minor = i2c_smbus_read_byte_data(client, 0x0);
 
-	if (val < 0)
-		dev_dbg(&client->dev, "cpld(0x%x) reg(0x1) err %d\n",
-			client->addr, val);
-	
-	return sprintf(buf, "%d\n", val);
+    if (val_major < 0) {
+        dev_dbg(&client->dev, "cpld(0x%x) reg(0x1) err %d\n", client->addr, val_major);
+    }
+    if (val_minor < 0) {
+        dev_dbg(&client->dev, "cpld(0x%x) reg(0x0) err %d\n", client->addr, val_minor);
+    }
+
+    return sprintf(buf, "%x.%x\n", val_major, val_minor);
 }
 
 /*
@@ -206,12 +239,19 @@ static int as9736_64d_cpld_probe(struct i2c_client *client,
 	data->type = id->driver_data;
 
 	/* Register sysfs hooks */
-	switch (data->type) {
-	case as9736_64d_sys_cpld:
-	case as9736_64d_pdb_l_cpld:
-	case as9736_64d_pdb_r_cpld:
-		group = &as9736_64d_cpld1_group;
-		break;
+    switch (data->type) {
+    case as9736_64d_fpga:
+        group = &as9736_64d_fpga_group;
+        break;
+    case as9736_64d_sys_cpld:
+        group = &as9736_64d_sys_cpld_group;
+        break;
+    case as9736_64d_pdb_cpld:
+        group = &as9736_64d_pdb_cpld_group;
+        break;
+    case as9736_64d_scm_cpld:
+        group = &as9736_64d_scm_cpld_group;
+        break;
 	default:
 		break;
 	}
@@ -222,7 +262,10 @@ static int as9736_64d_cpld_probe(struct i2c_client *client,
 			goto exit_free;
 	}
 
-	as9736_64d_cpld_add_client(client);
+    if( data->type != as9736_64d_pdb_cpld ) {
+        as9736_64d_cpld_add_client(client);
+    }
+
 	return 0;
 
 exit_free:
@@ -240,11 +283,18 @@ static void as9736_64d_cpld_remove(struct i2c_client *client)
 
 	/* Remove sysfs hooks */
 	switch (data->type) {
-	case as9736_64d_sys_cpld:
-	case as9736_64d_pdb_l_cpld:
-	case as9736_64d_pdb_r_cpld:
-		group = &as9736_64d_cpld1_group;
-		break;
+    case as9736_64d_fpga:
+        group = &as9736_64d_fpga_group;
+        break;
+    case as9736_64d_sys_cpld:
+        group = &as9736_64d_sys_cpld_group;
+        break;
+    case as9736_64d_pdb_cpld:
+        group = &as9736_64d_pdb_cpld_group;
+        break;
+    case as9736_64d_scm_cpld:
+        group = &as9736_64d_scm_cpld_group;
+        break;
 	default:
 		break;
 	}
