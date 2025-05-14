@@ -108,7 +108,7 @@ int onlp_sysi_platform_info_get(onlp_platform_info_t* pi)
                    { "mb_cpld3_ver", 0, "Main CPLD3(0x62)"},
                    { "cpu_cpld_ver", 0, "CPU CPLD(0x65)"},
                    { "fan_cpld_ver", 0, "FAN CPLD(0x66)"},
-                   { "fpga_cpld_ver", 0, "FPGA CPLD(0x68)"} };
+                   { "fpga_cpld_ver", 0, "FPGA(0x68)"} };
     /* BMC version
        Major: decimal, Minor: hex, Aux[0]: hex, Aux[1]: hex, Aux[2]: hex,
        Aux[3]: hex. 
