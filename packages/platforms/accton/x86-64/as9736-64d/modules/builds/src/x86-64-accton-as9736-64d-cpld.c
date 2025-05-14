@@ -110,10 +110,6 @@ static struct attribute *as9736_64d_cpld_scm_attributes[] = {
     NULL
 };
 
-static struct attribute *as9736_64d_cpld_udb_attributes[] = {
-    NULL
-};
-
 static const struct attribute_group as9736_64d_cpld_cpu_group = {
     .attrs = as9736_64d_cpld_cpu_attributes,
 };
