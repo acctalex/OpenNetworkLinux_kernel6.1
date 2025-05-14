@@ -27,9 +27,6 @@
 #include <onlp/platformi/psui.h>
 #include "platform_lib.h"
 
-#define PSU_STATUS_PRESENT 1
-#define PSU_STATUS_POWER_GOOD 1
-
 #define VALIDATE(_id)                           \
     do {                                        \
         if(!ONLP_OID_IS_PSU(_id)) {             \
@@ -63,6 +60,7 @@ onlp_psui_info_get(onlp_oid_t id, onlp_psu_info_t* info)
     int ret   = ONLP_STATUS_OK;
     int pid = ONLP_OID_ID_GET(id);
     int thermal_count = 0;
+    psu_type_t psu_type = 0;
     VALIDATE(id);
 
     memset(info, 0, sizeof(onlp_psu_info_t));
@@ -82,6 +80,11 @@ onlp_psui_info_get(onlp_oid_t id, onlp_psu_info_t* info)
     }
     info->status |= ONLP_PSU_STATUS_PRESENT;
 
+    /* Set the associated oid_table */
+    thermal_count = CHASSIS_THERMAL_COUNT;
+    info->hdr.coids[0] = ONLP_THERMAL_ID_CREATE(thermal_count + (pid-1)*NUM_OF_THERMAL_PER_PSU + 1);
+    info->hdr.coids[1] = ONLP_THERMAL_ID_CREATE(thermal_count + (pid-1)*NUM_OF_THERMAL_PER_PSU + 2);
+
     /* Get power good status */
     val = 0;
     ret = psu_cpld_status_get(pid, "psu_power_good", &val);
@@ -92,62 +95,75 @@ onlp_psui_info_get(onlp_oid_t id, onlp_psu_info_t* info)
 
     if (val != PSU_STATUS_POWER_GOOD) {
         info->status |=  ONLP_PSU_STATUS_UNPLUGGED;
-        return ONLP_STATUS_OK;
+        info->caps = 0;
+        info->mvin = 0;
+        info->miin = 0;
+        info->mpin = 0;
+        info->mvout = 0;
+        info->miout = 0;
+        info->mpout = 0;
+    }
+    else {
+        /* Set capability */
+        psu_type = get_psu_type(pid, info->model, sizeof(info->model));
+        switch (psu_type) {
+            case PSU_TYPE_SPAACTN_03:
+                info->caps = ONLP_PSU_CAPS_AC;
+                break;
+            case PSU_TYPE_CRXT_T0T12:
+                info->caps = ONLP_PSU_CAPS_DC12;
+                break;
+            default:
+                info->caps = 0;
+                break;
+        }
+
+        /* Read voltage, current and power */
+        val = 0;
+        ret = psu_pmbus_info_get(pid, "psu_v_in", &val);
+        if (ret == ONLP_STATUS_OK && val) {
+            info->mvin  = val;
+            info->caps |= ONLP_PSU_CAPS_VIN;
+        }
+
+        val = 0;
+        ret = psu_pmbus_info_get(pid, "psu_i_in", &val);
+        if (ret == ONLP_STATUS_OK && val) {
+            info->miin  = val;
+            info->caps |= ONLP_PSU_CAPS_IIN;
+        }
+
+        val = 0;
+        ret = psu_pmbus_info_get(pid, "psu_p_in", &val);
+        if (ret == ONLP_STATUS_OK && val) {
+            info->mpin  = val;
+            info->caps |= ONLP_PSU_CAPS_PIN;
+        }
+
+        val = 0;
+        ret = psu_pmbus_info_get(pid, "psu_v_out", &val);
+        if (ret == ONLP_STATUS_OK && val) {
+            info->mvout = val;
+            info->caps |= ONLP_PSU_CAPS_VOUT;
+        }
+
+        val = 0;
+        ret = psu_pmbus_info_get(pid, "psu_i_out", &val);
+        if (ret == ONLP_STATUS_OK && val) {
+            info->miout = val;
+            info->caps |= ONLP_PSU_CAPS_IOUT;
+        }
+
+        val = 0;
+        ret = psu_pmbus_info_get(pid, "psu_p_out", &val);
+        if (ret == ONLP_STATUS_OK && val) {
+            info->mpout = val;
+            info->caps |= ONLP_PSU_CAPS_POUT;
+        }
     }
 
-    /* Set capability
-     */
-    info->caps = ONLP_PSU_CAPS_AC;
-
-    /* Set the associated oid_table */
-    thermal_count = CHASSIS_THERMAL_COUNT;
-    info->hdr.coids[0] = ONLP_THERMAL_ID_CREATE(thermal_count + (pid-1)*NUM_OF_THERMAL_PER_PSU + 1);
-    info->hdr.coids[1] = ONLP_THERMAL_ID_CREATE(thermal_count + (pid-1)*NUM_OF_THERMAL_PER_PSU + 2);
-
-    /* Read voltage, current and power */
-    val = 0;
-    ret = psu_pmbus_info_get(pid, "psu_v_in", &val);
-    if (ret == ONLP_STATUS_OK && val) {
-        info->mvin  = val;
-        info->caps |= ONLP_PSU_CAPS_VIN;
-    }
-
-    val = 0;
-    ret = psu_pmbus_info_get(pid, "psu_i_in", &val);
-    if (ret == ONLP_STATUS_OK && val) {
-        info->miin  = val;
-        info->caps |= ONLP_PSU_CAPS_IIN;
-    }
-
-    val = 0;
-    ret = psu_pmbus_info_get(pid, "psu_p_in", &val);
-    if (ret == ONLP_STATUS_OK && val) {
-        info->mpin  = val;
-        info->caps |= ONLP_PSU_CAPS_PIN;
-    }
-
-    val = 0;
-    ret = psu_pmbus_info_get(pid, "psu_v_out", &val);
-    if (ret == ONLP_STATUS_OK && val) {
-        info->mvout = val;
-        info->caps |= ONLP_PSU_CAPS_VOUT;
-    }
-
-    val = 0;
-    ret = psu_pmbus_info_get(pid, "psu_i_out", &val);
-    if (ret == ONLP_STATUS_OK && val) {
-        info->miout = val;
-        info->caps |= ONLP_PSU_CAPS_IOUT;
-    }
-
-    val = 0;
-    ret = psu_pmbus_info_get(pid, "psu_p_out", &val);
-    if (ret == ONLP_STATUS_OK && val) {
-        info->mpout = val;
-        info->caps |= ONLP_PSU_CAPS_POUT;
-    }
-
-    psu_eeprom_str_get(pid, info->model, sizeof(info->model), "psu_model_name");
+    /*PMBus no support serial_number*/
     psu_eeprom_str_get(pid, info->serial, sizeof(info->serial), "psu_serial_numer");
+
     return ONLP_STATUS_OK;
 }

@@ -195,3 +195,46 @@ int get_i2c_bus_offset(int *bus_offset)
     AIM_FREE_IF_PTR(i2c_bus_0_name);
     return ONLP_STATUS_OK;
 }
+
+psu_type_t get_psu_type(int id, char* modelname, int modelname_len)
+{
+    int   len = 0;
+    int   bus_offset = 0, bus_addr[] = {6, 7};
+    char  path[64] = {0};
+    char  *str = NULL;
+    char  *pre_path;
+
+    pre_path = psu_get_pmbus_dir(id);
+    if (pre_path == NULL)
+        return ONLP_STATUS_E_INTERNAL;
+
+    if (get_i2c_bus_offset(&bus_offset) != ONLP_STATUS_OK)
+        return ONLP_STATUS_E_INTERNAL;
+
+    snprintf(path, sizeof(path), pre_path, bus_addr[id-1]+bus_offset);
+    len = onlp_file_read_str(&str, "%s/%s", path, "psu_mfr_model");
+
+    if (!str || len <= 0) {
+        AIM_FREE_IF_PTR(str);
+        return PSU_TYPE_UNKNOWN;
+    }
+
+    if (!strncmp(str, "SPAACTN-03", strlen("SPAACTN-03")))
+    {
+        if (modelname)
+            aim_strlcpy(modelname, str, strlen("SPAACTN-03")<(modelname_len-1)?(strlen("SPAACTN-03")+1):(modelname_len-1));
+            AIM_FREE_IF_PTR(str);
+        return PSU_TYPE_SPAACTN_03;
+    }
+
+    if (!strncmp(str, "CRXT_T0T12", strlen("CRXT_T0T12")))
+    {
+        if (modelname)
+            aim_strlcpy(modelname, str, strlen("CRXT_T0T12")<(modelname_len-1)?(strlen("CRXT_T0T12")+1):(modelname_len-1));
+            AIM_FREE_IF_PTR(str);
+        return PSU_TYPE_CRXT_T0T12;
+    }
+
+    AIM_FREE_IF_PTR(str);
+    return PSU_TYPE_UNKNOWN;
+}
