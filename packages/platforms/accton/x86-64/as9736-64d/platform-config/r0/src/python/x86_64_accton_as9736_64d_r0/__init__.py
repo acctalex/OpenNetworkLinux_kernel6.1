@@ -35,12 +35,12 @@ class OnlPlatform_x86_64_accton_as9736_64d_r0(OnlPlatformAccton,
 
         self.new_i2c_devices([
             # initialize CPLD & FPGA
-            ('as9736_64d_cpld_cpu', 0x60, 6),
+            ('as9736_64d_sys_cpld', 0x60, 6),
             ('sys_fpga', 0x60, 17),
             ('as9736_64d_fan', 0x33, 25),
-            ('as9736_64d_cpld_pdb', 0x60, 36),
-            ('as9736_64d_cpld_pdb', 0x60, 44),
-            ('as9736_64d_cpld_scm', 0x35, 51),
+            ('as9736_64d_pdb_cpld', 0x60, 36),
+            ('as9736_64d_pdb_cpld', 0x60, 44),
+            ('as9736_64d_scm_cpld', 0x35, 51),
             #('as9736_64d_udb_cpld1', 0x60, 60), read by pcie
             #('as9736_64d_udb_cpld2', 0x61, 61), read by pcie
             #('as9736_64d_ldb_cpld1', 0x61, 68), read by pcie

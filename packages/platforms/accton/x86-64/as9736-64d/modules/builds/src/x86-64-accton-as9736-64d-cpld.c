@@ -47,9 +47,9 @@ struct cpld_client_node {
 
 enum cpld_type {
     as9736_64d_fpga,
-    as9736_64d_cpld_cpu,
-    as9736_64d_cpld_pdb,
-    as9736_64d_cpld_scm
+    as9736_64d_sys_cpld,
+    as9736_64d_pdb_cpld,
+    as9736_64d_scm_cpld
 };
 
 struct as9736_64d_cpld_data {
@@ -60,9 +60,9 @@ struct as9736_64d_cpld_data {
 
 static const struct i2c_device_id as9736_64d_cpld_id[] = {
     { "as9736_64d_fpga", as9736_64d_fpga },
-    { "as9736_64d_cpld_cpu", as9736_64d_cpld_cpu },
-    { "as9736_64d_cpld_pdb", as9736_64d_cpld_pdb },
-    { "as9736_64d_cpld_scm", as9736_64d_cpld_scm },
+    { "as9736_64d_sys_cpld", as9736_64d_sys_cpld },
+    { "as9736_64d_pdb_cpld", as9736_64d_pdb_cpld },
+    { "as9736_64d_scm_cpld", as9736_64d_scm_cpld },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, as9736_64d_cpld_id);
@@ -95,31 +95,31 @@ static const struct attribute_group as9736_64d_fpga_group = {
 	.attrs = as9736_64d_fpga_attributes,
 };
 
-static struct attribute *as9736_64d_cpld_cpu_attributes[] = {
+static struct attribute *as9736_64d_sys_cpld_attributes[] = {
     &sensor_dev_attr_version.dev_attr.attr,
     NULL
 };
 
-static struct attribute *as9736_64d_cpld_pdb_attributes[] = {
+static struct attribute *as9736_64d_pdb_cpld_attributes[] = {
     &sensor_dev_attr_version.dev_attr.attr,
     NULL
 };
 
-static struct attribute *as9736_64d_cpld_scm_attributes[] = {
+static struct attribute *as9736_64d_scm_cpld_attributes[] = {
     &sensor_dev_attr_version.dev_attr.attr,
     NULL
 };
 
-static const struct attribute_group as9736_64d_cpld_cpu_group = {
-    .attrs = as9736_64d_cpld_cpu_attributes,
+static const struct attribute_group as9736_64d_sys_cpld_group = {
+    .attrs = as9736_64d_sys_cpld_attributes,
 };
 
-static const struct attribute_group as9736_64d_cpld_pdb_group = {
-    .attrs = as9736_64d_cpld_pdb_attributes,
+static const struct attribute_group as9736_64d_pdb_cpld_group = {
+    .attrs = as9736_64d_pdb_cpld_attributes,
 };
 
-static const struct attribute_group as9736_64d_cpld_scm_group = {
-    .attrs = as9736_64d_cpld_scm_attributes,
+static const struct attribute_group as9736_64d_scm_cpld_group = {
+    .attrs = as9736_64d_scm_cpld_attributes,
 };
 
 static ssize_t access(struct device *dev, struct device_attribute *da,
@@ -243,14 +243,14 @@ static int as9736_64d_cpld_probe(struct i2c_client *client,
     case as9736_64d_fpga:
         group = &as9736_64d_fpga_group;
         break;
-    case as9736_64d_cpld_cpu:
-        group = &as9736_64d_cpld_cpu_group;
+    case as9736_64d_sys_cpld:
+        group = &as9736_64d_sys_cpld_group;
         break;
-    case as9736_64d_cpld_pdb:
-        group = &as9736_64d_cpld_pdb_group;
+    case as9736_64d_pdb_cpld:
+        group = &as9736_64d_pdb_cpld_group;
         break;
-    case as9736_64d_cpld_scm:
-        group = &as9736_64d_cpld_scm_group;
+    case as9736_64d_scm_cpld:
+        group = &as9736_64d_scm_cpld_group;
         break;
 	default:
 		break;
@@ -262,7 +262,7 @@ static int as9736_64d_cpld_probe(struct i2c_client *client,
 			goto exit_free;
 	}
 
-    if( data->type != as9736_64d_cpld_pdb ) {
+    if( data->type != as9736_64d_pdb_cpld ) {
         as9736_64d_cpld_add_client(client);
     }
 
@@ -286,14 +286,14 @@ static void as9736_64d_cpld_remove(struct i2c_client *client)
     case as9736_64d_fpga:
         group = &as9736_64d_fpga_group;
         break;
-    case as9736_64d_cpld_cpu:
-        group = &as9736_64d_cpld_cpu_group;
+    case as9736_64d_sys_cpld:
+        group = &as9736_64d_sys_cpld_group;
         break;
-    case as9736_64d_cpld_pdb:
-        group = &as9736_64d_cpld_pdb_group;
+    case as9736_64d_pdb_cpld:
+        group = &as9736_64d_pdb_cpld_group;
         break;
-    case as9736_64d_cpld_scm:
-        group = &as9736_64d_cpld_scm_group;
+    case as9736_64d_scm_cpld:
+        group = &as9736_64d_scm_cpld_group;
         break;
 	default:
 		break;
