@@ -163,6 +163,7 @@ int onlp_sysi_platform_info_get(onlp_platform_info_t* pi)
 void onlp_sysi_platform_info_free(onlp_platform_info_t* pi)
 {
 	aim_free(pi->cpld_versions);
+	aim_free(pi->other_versions);
 }
 
 /*
