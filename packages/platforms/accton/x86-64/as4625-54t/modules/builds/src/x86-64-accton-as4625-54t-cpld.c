@@ -543,7 +543,6 @@ static void as4625_cpld_remove(struct i2c_client *client)
 		sysfs_remove_group(&client->dev.kobj, group);
 
 	kfree(data);
-	return 0;
 }
 
 static int as4625_cpld_read_internal(struct i2c_client *client, u8 reg)
