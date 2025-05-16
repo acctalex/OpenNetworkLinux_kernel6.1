@@ -38,103 +38,103 @@
 
 #define NUM_OF_FAN_ON_MAIN_BROAD    6
 #define PREFIX_PATH_ON_CPLD_DEV    "/sys/bus/i2c/devices/"
-#define NUM_OF_CPLD		   5
+#define NUM_OF_CPLD        5
 #define FAN_DUTY_CYCLE_MAX         (100)
 #define FAN_DUTY_CYCLE_DEFAULT     (38)
 #define BIOS_VER_PATH "/sys/devices/virtual/dmi/id/bios_version"
 
 static char arr_cplddev_name[NUM_OF_CPLD][10] =
 {
-	"1-0065",
-	"1-0060",
-	"10-0061",
-	"10-0062",
-	"14-0066"
+    "1-0065",
+    "1-0060",
+    "10-0061",
+    "10-0062",
+    "14-0066"
 };
 
 const char* onlp_sysi_platform_get(void)
 {
-	return "x86-64-accton-as9726-32d-r0";
+    return "x86-64-accton-as9726-32d-r0";
 }
 
 int onlp_sysi_onie_data_get(uint8_t** data, int* size)
 {
-	uint8_t* rdata = aim_zmalloc(256);
+    uint8_t* rdata = aim_zmalloc(256);
 
-	if (onlp_file_read(rdata, 256, size, IDPROM_PATH) == ONLP_STATUS_OK) {
-		if (*size == 256) {
-			*data = rdata;
-			return ONLP_STATUS_OK;
-		}
-	}
+    if (onlp_file_read(rdata, 256, size, IDPROM_PATH) == ONLP_STATUS_OK) {
+        if (*size == 256) {
+            *data = rdata;
+            return ONLP_STATUS_OK;
+        }
+    }
 
-	aim_free(rdata);
-	*size = 0;
-	return ONLP_STATUS_E_INTERNAL;
+    aim_free(rdata);
+    *size = 0;
+    return ONLP_STATUS_E_INTERNAL;
 }
 
 int onlp_sysi_oids_get(onlp_oid_t* table, int max)
 {
-	int i;
-	onlp_oid_t* e = table;
-	memset(table, 0, max*sizeof(onlp_oid_t));
+    int i;
+    onlp_oid_t* e = table;
+    memset(table, 0, max*sizeof(onlp_oid_t));
 
-	/* 7 Thermal sensors on the chassis */
-	for (i = 1; i <= CHASSIS_THERMAL_COUNT; i++)
-		*e++ = ONLP_THERMAL_ID_CREATE(i);
+    /* 7 Thermal sensors on the chassis */
+    for (i = 1; i <= CHASSIS_THERMAL_COUNT; i++)
+        *e++ = ONLP_THERMAL_ID_CREATE(i);
 
-	/* 5 LEDs on the chassis */
-	for (i = 1; i <= CHASSIS_LED_COUNT; i++)
-		*e++ = ONLP_LED_ID_CREATE(i);
+    /* 5 LEDs on the chassis */
+    for (i = 1; i <= CHASSIS_LED_COUNT; i++)
+        *e++ = ONLP_LED_ID_CREATE(i);
 
-	/* 2 PSUs on the chassis */
-	for (i = 1; i <= CHASSIS_PSU_COUNT; i++)
-		*e++ = ONLP_PSU_ID_CREATE(i);
+    /* 2 PSUs on the chassis */
+    for (i = 1; i <= CHASSIS_PSU_COUNT; i++)
+        *e++ = ONLP_PSU_ID_CREATE(i);
 
-	/* 6 Fans on the chassis */
-	for (i = 1; i <= CHASSIS_FAN_COUNT; i++)
-		*e++ = ONLP_FAN_ID_CREATE(i);
+    /* 6 Fans on the chassis */
+    for (i = 1; i <= CHASSIS_FAN_COUNT; i++)
+        *e++ = ONLP_FAN_ID_CREATE(i);
 
-	return 0;
+    return 0;
 }
 
 int onlp_sysi_platform_info_get(onlp_platform_info_t* pi)
 {
-	int   i, v[NUM_OF_CPLD]={0};
-	onlp_onie_info_t onie;
-	char *bios_ver = NULL;
+    int   i, v[NUM_OF_CPLD]={0};
+    onlp_onie_info_t onie;
+    char *bios_ver = NULL;
 
-	/* BIOS version */
-	onlp_file_read_str(&bios_ver, BIOS_VER_PATH);
-	/* ONIE version */
-	onlp_onie_decode_file(&onie, IDPROM_PATH);
+    /* BIOS version */
+    onlp_file_read_str(&bios_ver, BIOS_VER_PATH);
+    /* ONIE version */
+    onlp_onie_decode_file(&onie, IDPROM_PATH);
 
-	for (i = 0; i < NUM_OF_CPLD; i++) {
-		v[i] = 0;
+    for (i = 0; i < NUM_OF_CPLD; i++) {
+        v[i] = 0;
 
-		onlp_file_read_int(v+i, "%s%s/version", PREFIX_PATH_ON_CPLD_DEV, arr_cplddev_name[i]);
-	}
+        onlp_file_read_int(v+i, "%s%s/version", PREFIX_PATH_ON_CPLD_DEV, arr_cplddev_name[i]);
+    }
 
-	pi->cpld_versions = aim_fstrdup("\r\n\t   CPU CPLD(0x65): %02X"
-									"\r\n\t   FPGA(0x60): %02X"
-									"\r\n\t   Main CPLD2(0x61): %02X"
-									"\r\n\t   Main CPLD3(0x62): %02X"
-									"\r\n\t   FAN CPLD(0x66): %02X"
-									, v[0], v[1], v[2], v[3], v[4]);
+    pi->cpld_versions = aim_fstrdup("\r\n\t   CPU CPLD(0x65): %02X"
+                                    "\r\n\t   FPGA(0x60): %02X"
+                                    "\r\n\t   Main CPLD2(0x61): %02X"
+                                    "\r\n\t   Main CPLD3(0x62): %02X"
+                                    "\r\n\t   FAN CPLD(0x66): %02X"
+                                    , v[0], v[1], v[2], v[3], v[4]);
 
-	pi->other_versions = aim_fstrdup("\r\n\t   BIOS: %s\r\n\t   ONIE: %s",
-									bios_ver, onie.onie_version);
+    pi->other_versions = aim_fstrdup("\r\n\t   BIOS: %s\r\n\t   ONIE: %s",
+                                    bios_ver, onie.onie_version);
 
-	onlp_onie_info_free(&onie);
-	AIM_FREE_IF_PTR(bios_ver);
+    onlp_onie_info_free(&onie);
+    AIM_FREE_IF_PTR(bios_ver);
 
-	return 0;
+    return 0;
 }
 
 void onlp_sysi_platform_info_free(onlp_platform_info_t* pi)
 {
-	aim_free(pi->cpld_versions);
-	aim_free(pi->other_versions);
+    aim_free(pi->cpld_versions);
+    aim_free(pi->other_versions);
 }
 
 /*
@@ -157,40 +157,40 @@ void onlp_sysi_platform_info_free(onlp_platform_info_t* pi)
 
 
 typedef struct fan_ctrl_policy {
-	int duty_cycle;
-	int pwm;
-	int temp_down; /* The boundary temperature to down adjust fan speed */
-	int temp_up;   /* The boundary temperature to up adjust fan speed */
-	int state;
+    int duty_cycle;
+    int pwm;
+    int temp_down; /* The boundary temperature to down adjust fan speed */
+    int temp_up;   /* The boundary temperature to up adjust fan speed */
+    int state;
 } fan_ctrl_policy_t;
 
 enum
 {
-	LEVEL_FAN_DEF=0,
-	LEVEL_FAN_MID,
-	LEVEL_FAN_MAX,
-	LEVEL_TEMP_HIGH,
-	LEVEL_TEMP_CRITICAL
+    LEVEL_FAN_DEF=0,
+    LEVEL_FAN_MID,
+    LEVEL_FAN_MAX,
+    LEVEL_TEMP_HIGH,
+    LEVEL_TEMP_CRITICAL
 };
 
 fan_ctrl_policy_t  fan_thermal_policy_f2b[] = {
-	{50,  0x7, 0,     39000,   LEVEL_FAN_DEF},
-	{75,  0xB, 39000, 46000,   LEVEL_FAN_MID},
-	{100, 0xF, 46000, 50000,   LEVEL_FAN_MAX},
-	{100, 0xF, 50000, 55000,   LEVEL_TEMP_HIGH},
-	{100, 0xF, 55000, 200000,  LEVEL_TEMP_CRITICAL}
+    {50,  0x7, 0,     39000,   LEVEL_FAN_DEF},
+    {75,  0xB, 39000, 46000,   LEVEL_FAN_MID},
+    {100, 0xF, 46000, 50000,   LEVEL_FAN_MAX},
+    {100, 0xF, 50000, 55000,   LEVEL_TEMP_HIGH},
+    {100, 0xF, 55000, 200000,  LEVEL_TEMP_CRITICAL}
 };
 
 fan_ctrl_policy_t  fan_thermal_policy_b2f[] = {
-	{75,  0xB, 0,     32000,   LEVEL_FAN_DEF},
-	{100, 0xF, 32000, 35000,   LEVEL_FAN_MID},
-	{100, 0xF, 35000, 40000,   LEVEL_FAN_MAX},
-	{100, 0xF, 40000, 45000,   LEVEL_TEMP_HIGH},
-	{100, 0xF, 45000, 200000,  LEVEL_TEMP_CRITICAL}
+    {75,  0xB, 0,     32000,   LEVEL_FAN_DEF},
+    {100, 0xF, 32000, 35000,   LEVEL_FAN_MID},
+    {100, 0xF, 35000, 40000,   LEVEL_FAN_MAX},
+    {100, 0xF, 40000, 45000,   LEVEL_TEMP_HIGH},
+    {100, 0xF, 45000, 200000,  LEVEL_TEMP_CRITICAL}
 };
 
 #define FAN_SPEED_CTRL_PATH \
-	"/sys/bus/i2c/devices/14-0066/fan_duty_cycle_percentage"
+    "/sys/bus/i2c/devices/14-0066/fan_duty_cycle_percentage"
 #define FAN_DIRECTION_PATH "/sys/bus/i2c/devices/14-0066/fan1_direction"
 
 static int fan_state=LEVEL_FAN_DEF;
@@ -199,206 +199,206 @@ static int fan_fail = 0;
 
 int onlp_sysi_platform_manage_fans(void)
 {
-	int i=0, ori_state=LEVEL_FAN_DEF, current_state=LEVEL_FAN_DEF;
-	int  fd, len, value = 1;
-	int cur_duty_cycle, new_duty_cycle, temp = 0;
-	onlp_thermal_info_t thermal_4, thermal_5;
-	char  buf[10] = {0};
-	fan_ctrl_policy_t *fan_thermal_policy;
+    int i=0, ori_state=LEVEL_FAN_DEF, current_state=LEVEL_FAN_DEF;
+    int  fd, len, value = 1;
+    int cur_duty_cycle, new_duty_cycle, temp = 0;
+    onlp_thermal_info_t thermal_4, thermal_5;
+    char  buf[10] = {0};
+    fan_ctrl_policy_t *fan_thermal_policy;
 
- 	/* Get fan direction
- 	 */
-	if (onlp_file_read_int(&value, FAN_DIRECTION_PATH) < 0)
-		AIM_LOG_ERROR("Unable to read status from file (%s)\r\n",
-			      FAN_DIRECTION_PATH);
+    /* Get fan direction
+     */
+    if (onlp_file_read_int(&value, FAN_DIRECTION_PATH) < 0)
+        AIM_LOG_ERROR("Unable to read status from file (%s)\r\n",
+                  FAN_DIRECTION_PATH);
 
-	if (value == 0)
-		fan_thermal_policy=fan_thermal_policy_f2b;
-	else
-		fan_thermal_policy=fan_thermal_policy_b2f;
+    if (value == 0)
+        fan_thermal_policy=fan_thermal_policy_f2b;
+    else
+        fan_thermal_policy=fan_thermal_policy_b2f;
 
-	/* Get current temperature
-	 */
-	if (onlp_thermali_info_get(ONLP_THERMAL_ID_CREATE(4), &thermal_4) != 
-	    ONLP_STATUS_OK) {
-		AIM_LOG_ERROR("Unable to read thermal status, set fans to 75 %% speed");
-		onlp_fani_percentage_set(ONLP_FAN_ID_CREATE(1), 
-					 fan_thermal_policy[LEVEL_FAN_MID].duty_cycle);
-		return ONLP_STATUS_E_INTERNAL;
-	}
+    /* Get current temperature
+     */
+    if (onlp_thermali_info_get(ONLP_THERMAL_ID_CREATE(4), &thermal_4) != 
+        ONLP_STATUS_OK) {
+        AIM_LOG_ERROR("Unable to read thermal status, set fans to 75 %% speed");
+        onlp_fani_percentage_set(ONLP_FAN_ID_CREATE(1), 
+                     fan_thermal_policy[LEVEL_FAN_MID].duty_cycle);
+        return ONLP_STATUS_E_INTERNAL;
+    }
 
-	if (onlp_thermali_info_get(ONLP_THERMAL_ID_CREATE(5), &thermal_5) != 
-	   ONLP_STATUS_OK) {
-		AIM_LOG_ERROR("Unable to read thermal status, set fans to 75 %% speed");
-		onlp_fani_percentage_set(ONLP_FAN_ID_CREATE(1), 
-				fan_thermal_policy[LEVEL_FAN_MID].duty_cycle);
-		return ONLP_STATUS_E_INTERNAL;
-	}
+    if (onlp_thermali_info_get(ONLP_THERMAL_ID_CREATE(5), &thermal_5) != 
+       ONLP_STATUS_OK) {
+        AIM_LOG_ERROR("Unable to read thermal status, set fans to 75 %% speed");
+        onlp_fani_percentage_set(ONLP_FAN_ID_CREATE(1), 
+                fan_thermal_policy[LEVEL_FAN_MID].duty_cycle);
+        return ONLP_STATUS_E_INTERNAL;
+    }
 
-	temp = (thermal_4.mcelsius + thermal_5.mcelsius) / 2;
-	/* Get current fan pwm percent
-	 */
-	fd = open(FAN_SPEED_CTRL_PATH, O_RDONLY);
-	if (fd == -1){
-		AIM_LOG_ERROR("Unable to open fan speed control node (%s)", 
-			      FAN_SPEED_CTRL_PATH);
-		return ONLP_STATUS_E_INTERNAL;
-	}
-	len = read(fd, buf, sizeof(buf));
-	close(fd);
-	if (len <= 0){
-		AIM_LOG_ERROR("Unable to read fan speed from (%s)", 
-			      FAN_SPEED_CTRL_PATH);
-		return ONLP_STATUS_E_INTERNAL;
-	}
-	cur_duty_cycle = atoi(buf);
-	ori_state=fan_state;
-	/* Inpunt temp to get theraml_polyc state and new pwm percent. */
-	for (i=0; i < sizeof(fan_thermal_policy_f2b)/sizeof(fan_ctrl_policy_t);
-	    i++) {
-		if (temp > fan_thermal_policy[i].temp_down) {
-			if (temp <= fan_thermal_policy[i].temp_up)
-				current_state = i;
-		}
-	}
+    temp = (thermal_4.mcelsius + thermal_5.mcelsius) / 2;
+    /* Get current fan pwm percent
+     */
+    fd = open(FAN_SPEED_CTRL_PATH, O_RDONLY);
+    if (fd == -1){
+        AIM_LOG_ERROR("Unable to open fan speed control node (%s)", 
+                  FAN_SPEED_CTRL_PATH);
+        return ONLP_STATUS_E_INTERNAL;
+    }
+    len = read(fd, buf, sizeof(buf));
+    close(fd);
+    if (len <= 0){
+        AIM_LOG_ERROR("Unable to read fan speed from (%s)", 
+                  FAN_SPEED_CTRL_PATH);
+        return ONLP_STATUS_E_INTERNAL;
+    }
+    cur_duty_cycle = atoi(buf);
+    ori_state=fan_state;
+    /* Inpunt temp to get theraml_polyc state and new pwm percent. */
+    for (i=0; i < sizeof(fan_thermal_policy_f2b)/sizeof(fan_ctrl_policy_t);
+        i++) {
+        if (temp > fan_thermal_policy[i].temp_down) {
+            if (temp <= fan_thermal_policy[i].temp_up)
+                current_state = i;
+        }
+    }
 
-	if (current_state > LEVEL_TEMP_CRITICAL ||
-	    current_state < LEVEL_FAN_DEF) {
-		AIM_LOG_ERROR("onlp_sysi_platform_manage_fans get error  current_state\n");
-		return 0;
-	}
+    if (current_state > LEVEL_TEMP_CRITICAL ||
+        current_state < LEVEL_FAN_DEF) {
+        AIM_LOG_ERROR("onlp_sysi_platform_manage_fans get error  current_state\n");
+        return 0;
+    }
 
-	/* Decision 3: Decide new fan pwm percent.
-	 */
-	if (fan_fail == 0 && cur_duty_cycle != 
-	    fan_thermal_policy[current_state].duty_cycle) {
-		new_duty_cycle = fan_thermal_policy[current_state].duty_cycle;
-		onlp_fani_percentage_set(ONLP_FAN_ID_CREATE(1), 
-					 new_duty_cycle);
-	}
+    /* Decision 3: Decide new fan pwm percent.
+     */
+    if (fan_fail == 0 && cur_duty_cycle != 
+        fan_thermal_policy[current_state].duty_cycle) {
+        new_duty_cycle = fan_thermal_policy[current_state].duty_cycle;
+        onlp_fani_percentage_set(ONLP_FAN_ID_CREATE(1), 
+                     new_duty_cycle);
+    }
 
-	/* Get each fan status
-	 */
+    /* Get each fan status
+     */
 
-	for (i = 1; i <= NUM_OF_FAN_ON_MAIN_BROAD; i++) {
-		onlp_fan_info_t fan_info;
+    for (i = 1; i <= NUM_OF_FAN_ON_MAIN_BROAD; i++) {
+        onlp_fan_info_t fan_info;
 
-		if (onlp_fani_info_get(ONLP_FAN_ID_CREATE(i), &fan_info) != 
-		    ONLP_STATUS_OK) {
-			AIM_LOG_ERROR("Unable to get fan(%d) status, try to set the other fans as full speed\r\n",
-				      i);
-			onlp_fani_percentage_set(ONLP_FAN_ID_CREATE(1),
-						 FAN_DUTY_CYCLE_MAX);
-			fan_fail = 1;
-			break;
-		} else {
-			fan_fail = 0;
-		}
+        if (onlp_fani_info_get(ONLP_FAN_ID_CREATE(i), &fan_info) != 
+            ONLP_STATUS_OK) {
+            AIM_LOG_ERROR("Unable to get fan(%d) status, try to set the other fans as full speed\r\n",
+                      i);
+            onlp_fani_percentage_set(ONLP_FAN_ID_CREATE(1),
+                         FAN_DUTY_CYCLE_MAX);
+            fan_fail = 1;
+            break;
+        } else {
+            fan_fail = 0;
+        }
 
-		/* Decision 1: Set fan as full speed if any fan is failed.
-		 */
-		if (fan_info.status & ONLP_FAN_STATUS_FAILED || 
-		    !(fan_info.status & ONLP_FAN_STATUS_PRESENT)) {
-			AIM_LOG_ERROR("Fan(%d) is not working, set the other fans as full speed\r\n", 
-				      i);
-			onlp_fani_percentage_set(ONLP_FAN_ID_CREATE(1),
-						 FAN_DUTY_CYCLE_MAX);
-			fan_fail = 1;
-			break;
-		} else {
-			fan_fail = 0;
-		}
-	}
+        /* Decision 1: Set fan as full speed if any fan is failed.
+         */
+        if (fan_info.status & ONLP_FAN_STATUS_FAILED || 
+            !(fan_info.status & ONLP_FAN_STATUS_PRESENT)) {
+            AIM_LOG_ERROR("Fan(%d) is not working, set the other fans as full speed\r\n", 
+                      i);
+            onlp_fani_percentage_set(ONLP_FAN_ID_CREATE(1),
+                         FAN_DUTY_CYCLE_MAX);
+            fan_fail = 1;
+            break;
+        } else {
+            fan_fail = 0;
+        }
+    }
 
-	if (current_state != ori_state) {
-		fan_state = current_state;
+    if (current_state != ori_state) {
+        fan_state = current_state;
 
-		switch (ori_state) {
-		case LEVEL_FAN_DEF:
-			if (current_state == LEVEL_TEMP_HIGH) {
-				if (alarm_state == 0) {
-					AIM_SYSLOG_WARN("Temperature high",
-							"Temperature high",
-							"Alarm for temperature high is detected");
-					alarm_state = 1;
-				}
-			}
-			if (current_state == LEVEL_TEMP_CRITICAL) {
-				AIM_SYSLOG_CRIT("Temperature critical",
-						"Temperature critical",
-						"Alarm for temperature critical is detected, reboot DUT");
-				system("sync;sync;sync");
-				system("reboot");
-			}
-			break;
-		case LEVEL_FAN_MID:
-			if (current_state == LEVEL_TEMP_HIGH) {
-				if (alarm_state == 0) {
-					AIM_SYSLOG_WARN("Temperature high",
-							"Temperature high",
-							"Alarm for temperature high is detected");
-					alarm_state = 1;
-				}
-			}
+        switch (ori_state) {
+        case LEVEL_FAN_DEF:
+            if (current_state == LEVEL_TEMP_HIGH) {
+                if (alarm_state == 0) {
+                    AIM_SYSLOG_WARN("Temperature high",
+                            "Temperature high",
+                            "Alarm for temperature high is detected");
+                    alarm_state = 1;
+                }
+            }
+            if (current_state == LEVEL_TEMP_CRITICAL) {
+                AIM_SYSLOG_CRIT("Temperature critical",
+                        "Temperature critical",
+                        "Alarm for temperature critical is detected, reboot DUT");
+                system("sync;sync;sync");
+                system("reboot");
+            }
+            break;
+        case LEVEL_FAN_MID:
+            if (current_state == LEVEL_TEMP_HIGH) {
+                if (alarm_state == 0) {
+                    AIM_SYSLOG_WARN("Temperature high",
+                            "Temperature high",
+                            "Alarm for temperature high is detected");
+                    alarm_state = 1;
+                }
+            }
 
-			if (current_state == LEVEL_TEMP_CRITICAL) {
-				AIM_SYSLOG_CRIT("Temperature critical",
-						"Temperature critical", 
-						"Alarm for temperature critical is detected, reboot DUT");
-				system("sync;sync;sync");
-				system("reboot");
-			}
-			break;
-		case LEVEL_FAN_MAX:
-			if (current_state == LEVEL_TEMP_HIGH) {
-				if (alarm_state == 0) {
-					AIM_SYSLOG_WARN("Temperature high",
-							"Temperature high",
-							"Alarm for temperature high is detected");
-					alarm_state = 1;
-				}
-			}
-			if (current_state == LEVEL_TEMP_CRITICAL) {
-				AIM_SYSLOG_CRIT("Temperature critical",
-						"Temperature critical ",
-						"Alarm for temperature critical is detected, reboot DUT");
-				system("sync;sync;sync");
-				system("reboot");
-			}
-			break;
-		case LEVEL_TEMP_HIGH:
-			if (current_state == LEVEL_TEMP_CRITICAL) {
-				AIM_SYSLOG_CRIT("Temperature critical",
-						"Temperature critical ",
-						"Alarm for temperature critical is detected, reboot DUT");
-				system("sync;sync;sync");
-				system("reboot");
-			}
-			break;
-		case LEVEL_TEMP_CRITICAL:
-			break;
-		default:
-				AIM_SYSLOG_WARN("onlp_sysi_platform_manage_fans abnormal state",
-						"onlp_sysi_platform_manage_fans abnormal state",
-						"onlp_sysi_platform_manage_fans at abnormal state\n");
-			break;
-		}
-	}
+            if (current_state == LEVEL_TEMP_CRITICAL) {
+                AIM_SYSLOG_CRIT("Temperature critical",
+                        "Temperature critical", 
+                        "Alarm for temperature critical is detected, reboot DUT");
+                system("sync;sync;sync");
+                system("reboot");
+            }
+            break;
+        case LEVEL_FAN_MAX:
+            if (current_state == LEVEL_TEMP_HIGH) {
+                if (alarm_state == 0) {
+                    AIM_SYSLOG_WARN("Temperature high",
+                            "Temperature high",
+                            "Alarm for temperature high is detected");
+                    alarm_state = 1;
+                }
+            }
+            if (current_state == LEVEL_TEMP_CRITICAL) {
+                AIM_SYSLOG_CRIT("Temperature critical",
+                        "Temperature critical ",
+                        "Alarm for temperature critical is detected, reboot DUT");
+                system("sync;sync;sync");
+                system("reboot");
+            }
+            break;
+        case LEVEL_TEMP_HIGH:
+            if (current_state == LEVEL_TEMP_CRITICAL) {
+                AIM_SYSLOG_CRIT("Temperature critical",
+                        "Temperature critical ",
+                        "Alarm for temperature critical is detected, reboot DUT");
+                system("sync;sync;sync");
+                system("reboot");
+            }
+            break;
+        case LEVEL_TEMP_CRITICAL:
+            break;
+        default:
+                AIM_SYSLOG_WARN("onlp_sysi_platform_manage_fans abnormal state",
+                        "onlp_sysi_platform_manage_fans abnormal state",
+                        "onlp_sysi_platform_manage_fans at abnormal state\n");
+            break;
+        }
+    }
 
-	if(alarm_state == 1 && current_state < LEVEL_TEMP_HIGH) {
-		if (temp < 
-		    (fan_thermal_policy[LEVEL_TEMP_HIGH].temp_down - 5000)) {  /*below 58 C, clear alarm*/
-			AIM_SYSLOG_INFO("Temperature high is clean",
-					"Temperature high is clear",
-					"Alarm for temperature high is cleared");
-			alarm_state = 0;
-		}
-	}
+    if(alarm_state == 1 && current_state < LEVEL_TEMP_HIGH) {
+        if (temp < 
+            (fan_thermal_policy[LEVEL_TEMP_HIGH].temp_down - 5000)) {  /*below 58 C, clear alarm*/
+            AIM_SYSLOG_INFO("Temperature high is clean",
+                    "Temperature high is clear",
+                    "Alarm for temperature high is cleared");
+            alarm_state = 0;
+        }
+    }
 
-	return 0;
+    return 0;
 }
 
 int onlp_sysi_platform_manage_leds(void)
 {
-	return ONLP_STATUS_E_UNSUPPORTED;
+    return ONLP_STATUS_E_UNSUPPORTED;
 }
