@@ -38,11 +38,23 @@
 #define PSU1_ID 1
 #define PSU2_ID 2
 
+#define PSU_NODE_MAX_PATH_LEN 64
 #define PSU_STATUS_POWER_GOOD 1
 
 #define PSU_SYSFS_PATH "/sys/devices/platform/as7946_74xkb_psu/"
 #define FAN_BOARD_PATH "/sys/devices/platform/as7946_74xkb_fan/"
 #define IDPROM_PATH    "/sys/devices/platform/as7946_74xkb_sys/eeprom"
+
+int psu_status_info_get(int id, char *node, int *value);
+
+#define AIM_FREE_IF_PTR(p) \
+    do \
+    { \
+        if (p) { \
+            aim_free(p); \
+            p = NULL; \
+        } \
+    } while (0)
 
 enum onlp_led_id {
     LED_LOC = 1,
@@ -50,6 +62,12 @@ enum onlp_led_id {
     LED_PSU1,
     LED_PSU2,
     LED_FAN,
+};
+
+enum onlp_psu_fan_dir {
+    PSU_FAN_RESERVED = 0,
+    PSU_FAN_F2B,
+    PSU_FAN_B2F,
 };
 
 enum onlp_thermal_id {
