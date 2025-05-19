@@ -146,7 +146,7 @@ onlp_sysi_platform_info_get(onlp_platform_info_t* pi)
     onlp_onie_decode_file(&onie, path);
 
     pi->cpld_versions = aim_fstrdup("\r\n\t   CPU CPLD(0x65): %02X.%02X"
-                                    "\r\n\t   Main CPLD(0x60): %02X.%02X"
+                                    "\r\n\t   Main CPLD(0x60): %02X.%02X\r\n"
                                     , v[0], v[1], v[2], v[3]);
 
     pi->other_versions = aim_fstrdup("\r\n\t   BIOS: %s\r\n\t   ONIE: %s",
