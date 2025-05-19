@@ -54,6 +54,9 @@
 
 #define PREFIX_PATH_ON_CPLD_DEV          "/sys/bus/i2c/devices/"
 #define NUM_OF_CPLD                      3
+
+#define BIOS_VER_PATH "/sys/devices/virtual/dmi/id/bios_version"
+
 static char arr_cplddev_name[NUM_OF_CPLD][10] =
 {
  "0-0060",
@@ -88,8 +91,10 @@ onlp_sysi_platform_info_get(onlp_platform_info_t* pi)
 {
     int   i, siz=NUM_OF_CPLD, v[NUM_OF_CPLD]={0};
     int   fd, len, nbytes = 10;
+    onlp_onie_info_t onie;
     char  r_data[10]   = {0};
     char  fullpath[65] = {0};
+    char *bios_ver = NULL;
 
     for (i=0; i<siz; i++)
     {
@@ -99,10 +104,22 @@ onlp_sysi_platform_info_get(onlp_platform_info_t* pi)
         memset(r_data, 0, len);
     }
 
+    onlp_file_read_str(&bios_ver, BIOS_VER_PATH);
+    onlp_onie_decode_file(&onie, IDPROM_PATH);
+
     if(3==NUM_OF_CPLD)
-        pi->cpld_versions = aim_fstrdup("%d.%d.%d", v[0], v[1], v[2]);
+        pi->cpld_versions = aim_fstrdup(
+                "\r\n\t   Main CPLD 1(0x60): %02X"
+                "\r\n\t   Main CPLD 2(0x61): %02X"
+                "\r\n\t   Main CPLD 3(0x62): %02X\r\n",
+                 v[0], v[1], v[2]);
     else
         printf("This CPLD numbers are wrong !! \n");
+
+    pi->other_versions = aim_fstrdup("\r\n\t   BIOS: %s\r\n\t   ONIE: %s",
+                                    bios_ver, onie.onie_version);
+
+    AIM_FREE_IF_PTR(bios_ver);
 
     return 0;
 }
@@ -111,6 +128,7 @@ void
 onlp_sysi_platform_info_free(onlp_platform_info_t* pi)
 {
     aim_free(pi->cpld_versions);
+    aim_free(pi->other_versions);
 }
 
 
