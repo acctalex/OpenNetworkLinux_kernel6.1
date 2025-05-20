@@ -68,14 +68,6 @@ usb_auth_file_array=("/sys/bus/usb/devices/usb1/authorized" \
                      "/sys/bus/usb/devices/usb3/authorized_default" \
                      "/sys/bus/usb/devices/3-0:1.0/authorized")
 
-function select_cpld_indx {
-    i=$1
-    if [ ${sfp_port_array[$i]} -le 0 ]; then
-        j=${sfp_port_array[$i]#-}
-        echo $((i+1))
-    fi
-}
-
 # Function SFP
 cpld_bus_idx=1
 port_status_cpld_i2c_bus_addr=${port_status_cpld_i2c_bus_addr_array[$cpld_bus_idx]}
