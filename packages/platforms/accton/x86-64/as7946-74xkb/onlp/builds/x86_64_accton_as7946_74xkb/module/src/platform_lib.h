@@ -44,6 +44,9 @@
 #define PSU_SYSFS_PATH "/sys/devices/platform/as7946_74xkb_psu/"
 #define FAN_BOARD_PATH "/sys/devices/platform/as7946_74xkb_fan/"
 #define IDPROM_PATH    "/sys/devices/platform/as7946_74xkb_sys/eeprom"
+#define BIOS_VER_PATH  "/sys/devices/virtual/dmi/id/bios_version"
+#define BMC_VER1_PATH  "/sys/devices/platform/ipmi_bmc.0/firmware_revision"
+#define BMC_VER2_PATH  "/sys/devices/platform/ipmi_bmc.0/aux_firmware_revision"
 
 int psu_status_info_get(int id, char *node, int *value);
 
