@@ -74,6 +74,7 @@ MODULE_DEVICE_TABLE(i2c, as7726_32x_cpld_id);
 
 enum as7726_32x_cpld1_sysfs_attributes {
 	CPLD_VERSION,
+    BIOS_FLASH_ID,
 	ACCESS,
 	MODULE_PRESENT_ALL,
 	MODULE_RXLOS_ALL,
@@ -132,6 +133,8 @@ static ssize_t access(struct device *dev, struct device_attribute *da,
 			const char *buf, size_t count);
 static ssize_t show_version(struct device *dev, struct device_attribute *da,
              char *buf);
+static ssize_t show_bios_flash_id(struct device *dev, struct device_attribute *da,
+             char *buf);
 static int as7726_32x_cpld_read_internal(struct i2c_client *client, u8 reg);
 static int as7726_32x_cpld_write_internal(struct i2c_client *client, u8 reg, u8 value);
 
@@ -150,6 +153,7 @@ static int as7726_32x_cpld_write_internal(struct i2c_client *client, u8 reg, u8 
 	
 
 static SENSOR_DEVICE_ATTR(version, S_IRUGO, show_version, NULL, CPLD_VERSION);
+static SENSOR_DEVICE_ATTR(bios_flash_id, S_IRUGO, show_bios_flash_id, NULL, BIOS_FLASH_ID);
 static SENSOR_DEVICE_ATTR(access, S_IWUSR, NULL, access, ACCESS);
 /* transceiver attributes */
 static SENSOR_DEVICE_ATTR(module_present_all, S_IRUGO, show_present_all, NULL, MODULE_PRESENT_ALL);
@@ -262,6 +266,7 @@ static const struct attribute_group as7726_32x_cpld3_group = {
 
 static struct attribute *as7726_32x_cpu_cpld_attributes[] = {
     &sensor_dev_attr_version.dev_attr.attr,
+    &sensor_dev_attr_bios_flash_id.dev_attr.attr,
     &sensor_dev_attr_access.dev_attr.attr,
 	NULL
 };
@@ -550,6 +555,16 @@ static ssize_t show_version(struct device *dev, struct device_attribute *attr, c
     }
 	
     return sprintf(buf, "%d\n", val);
+}
+
+static ssize_t show_bios_flash_id(struct device *dev, struct device_attribute *attr, char *buf)
+{
+    int val = 0;
+    struct i2c_client *client = to_i2c_client(dev);
+
+    val = i2c_smbus_read_byte_data(client, 0x2);
+
+    return sprintf(buf, "%d\n", ( ((val >> 4) & 0x1) == 1 ) ? 1 : 2); /*(BIT4) 1: master, 2: slave*/
 }
 
 /*
