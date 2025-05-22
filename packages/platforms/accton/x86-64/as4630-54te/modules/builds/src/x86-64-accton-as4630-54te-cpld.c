@@ -103,6 +103,7 @@ MODULE_DEVICE_TABLE(i2c, as4630_54te_cpld_id);
 enum as4630_54te_cpld_sysfs_attributes {
 	MAJOR_VERSION,
 	MINOR_VERSION,
+	BIOS_FLASH_ID,
 	ACCESS,
 	/* transceiver attributes */
 	MODULE_PRESENT_ALL,
@@ -158,6 +159,8 @@ static ssize_t access(struct device *dev, struct device_attribute *da,
 			const char *buf, size_t count);
 static ssize_t show_version(struct device *dev, struct device_attribute *da,
 			char *buf);
+static ssize_t show_bios_flash_id(struct device *dev, struct device_attribute *da,
+            char *buf);
 static int as4630_54te_cpld_read_internal(struct i2c_client *client,
 			u8 reg);
 static int as4630_54te_cpld_write_internal(struct i2c_client *client,
@@ -230,6 +233,7 @@ static SENSOR_DEVICE_ATTR(module_rx_los_all, S_IRUGO, show_rxlos_all, \
 
 static SENSOR_DEVICE_ATTR(major_version, S_IRUGO, show_version, NULL, MAJOR_VERSION);
 static SENSOR_DEVICE_ATTR(minor_version, S_IRUGO, show_version, NULL, MINOR_VERSION);
+static SENSOR_DEVICE_ATTR(bios_flash_id, S_IRUGO, show_bios_flash_id, NULL, BIOS_FLASH_ID);
 static SENSOR_DEVICE_ATTR(access, S_IWUSR, NULL, access, ACCESS);
 
 /* transceiver attributes */
@@ -268,6 +272,7 @@ static struct attribute *as4630_54te_cpld_attributes[] = {
 static struct attribute *as4630_54te_cpucpld_attributes[] = {
     &sensor_dev_attr_major_version.dev_attr.attr,
     &sensor_dev_attr_minor_version.dev_attr.attr,
+    &sensor_dev_attr_bios_flash_id.dev_attr.attr,
     &sensor_dev_attr_access.dev_attr.attr,
     NULL
 };
@@ -597,6 +602,16 @@ static ssize_t show_version(struct device *dev, struct device_attribute *da,
 	}
 
 	return sprintf(buf, "%d\n", val);
+}
+
+static ssize_t show_bios_flash_id(struct device *dev, struct device_attribute *attr, char *buf)
+{
+    int val = 0;
+    struct i2c_client *client = to_i2c_client(dev);
+
+    val = i2c_smbus_read_byte_data(client, 0x11);
+
+    return sprintf(buf, "%d\n", ( ((val >> 2) & 0x1) == 1 ) ? 1 : 2); /*(BIT2) 1: master, 2: slave*/
 }
 
 /* fan utility functions
