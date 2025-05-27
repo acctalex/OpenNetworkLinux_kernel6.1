@@ -37,7 +37,6 @@
 #include "x86_64_accton_as4630_54pe_log.h"
 
 
-#define BIOS_VER_PATH "/sys/devices/virtual/dmi/id/bios_version"
 
 #define NUM_OF_CPLD_VER             4
 #define FAN_DUTY_CYCLE_MAX         (100)
@@ -153,6 +152,7 @@ onlp_sysi_platform_info_get(onlp_platform_info_t* pi)
                                     bios_ver, onie.onie_version);
 
     AIM_FREE_IF_PTR(bios_ver);
+    onlp_onie_info_free(&onie);
 
     return ONLP_STATUS_OK;
 }
