@@ -167,7 +167,7 @@ static ssize_t show_version(struct device *dev, struct device_attribute *da,
 		return minor;
 	}
 
-	return sprintf(buf, "%d.%d\n", major, minor);
+	return sprintf(buf, "%x.%x\n", major, minor);
 }
 
 static ssize_t show(struct device *dev, struct device_attribute *da, char *buf)

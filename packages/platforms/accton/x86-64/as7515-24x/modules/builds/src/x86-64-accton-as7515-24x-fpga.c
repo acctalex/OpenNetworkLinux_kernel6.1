@@ -49,6 +49,7 @@
 #define FPGA_BOARD_INFO_REG			(FPGA_PCIE_START_OFFSET + 0x00)
 #define FPGA_MAJOR_VER_REG			(FPGA_PCIE_START_OFFSET + 0x01)
 #define FPGA_MINOR_VER_REG			(FPGA_PCIE_START_OFFSET + 0x02)
+#define FPGA_BIOS_FLASH_ID          (FPGA_PCIE_START_OFFSET + 0x36)
 
 /***********************************************
  *	   macro define
@@ -81,7 +82,8 @@ static struct platform_device *pdev = NULL;
  *	   enum define
  * *********************************************/
 enum fpga_sysfs_attributes {
-	FPGA_VERSION
+	FPGA_VERSION,
+	BIOS_FLASH_ID
 };
 
 /***********************************************
@@ -92,9 +94,11 @@ static ssize_t status_read(struct device *dev, struct device_attribute *da,
 			 char *buf);
 
 static SENSOR_DEVICE_ATTR(version, S_IRUGO, status_read, NULL, FPGA_VERSION);
+static SENSOR_DEVICE_ATTR(bios_flash_id, S_IRUGO, status_read, NULL, BIOS_FLASH_ID);
 
 static struct attribute *fpga_attributes[] = {
 	&sensor_dev_attr_version.dev_attr.attr,
+	&sensor_dev_attr_bios_flash_id.dev_attr.attr,
 	NULL
 };
 
@@ -158,6 +162,7 @@ static ssize_t status_read(struct device *dev, struct device_attribute *da, char
 	ssize_t ret = -EINVAL;
 	u16 reg;
 	u8 major, minor;
+    u8 bios_flash_id;
 
 	switch(attr->index)
 	{
@@ -167,8 +172,13 @@ static ssize_t status_read(struct device *dev, struct device_attribute *da, char
 			reg = FPGA_MINOR_VER_REG;
 			minor = fpga_read(fpga_ctl->pci_fpga_dev.data_base_addr0 + reg);
 
-			ret = sprintf(buf, "%d.%d\n", major, minor);
+			ret = sprintf(buf, "%x.%x\n", major, minor);
 			break;
+        case BIOS_FLASH_ID:
+            reg = FPGA_BIOS_FLASH_ID;
+            bios_flash_id = ( fpga_read(fpga_ctl->pci_fpga_dev.data_base_addr0 + reg) ) & 0x1;
+
+            ret = sprintf(buf, "%d\n", (bios_flash_id == 0x0) ? 1 : 2);
 		default:
 			break;
 	}

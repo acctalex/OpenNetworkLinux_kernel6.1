@@ -350,7 +350,7 @@ static ssize_t fan_show_value(struct device *dev, struct device_attribute *da,
 	if (data->valid) {
 		switch (attr->index) {
 		case FAN_FW_VERSION:
-			ret = sprintf(buf, "%d.%d\n",
+			ret = sprintf(buf, "%x.%x\n",
 					data->reg_val[FAN_MAJOR_VERSION_REG],
 					data->reg_val[FAN_MINOR_VERSION_REG]);
 		break;
