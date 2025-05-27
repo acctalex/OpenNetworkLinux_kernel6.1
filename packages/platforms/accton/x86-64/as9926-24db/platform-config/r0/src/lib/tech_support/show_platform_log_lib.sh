@@ -43,7 +43,7 @@ sys_led_sysfs=("/sys/devices/platform/${ipmi_psu_device_dir}/led_diag" \
                "/sys/devices/platform/${ipmi_psu_device_dir}/led_psu1" \
                "/sys/devices/platform/${ipmi_psu_device_dir}/led_psu2")
 
-sys_beacon_led_sysfs=""
+sys_beacon_led_sysfs="/sys/devices/platform/${ipmi_psu_device_dir}/led_loc"
 
 # USB
 usb_auth_file_array=("/sys/bus/usb/devices/usb1/authorized" \
