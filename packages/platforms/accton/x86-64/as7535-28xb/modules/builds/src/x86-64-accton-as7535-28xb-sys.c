@@ -45,11 +45,14 @@
 
 #define IPMI_SYSEEPROM_READ_CMD 0x18
 #define IPMI_CPLD_READ_CMD 0x20
+#define IPMI_CPLD_READ_REG_CMD 0x22
 
 static void ipmi_msg_handler(struct ipmi_recv_msg *msg, void *user_msg_data);
 static int as7535_28xb_sys_probe(struct platform_device *pdev);
 static int as7535_28xb_sys_remove(struct platform_device *pdev);
 static ssize_t show_version(struct device *dev,
+			struct device_attribute *da, char *buf);
+static ssize_t show_bios_flash_id(struct device *dev,
 			struct device_attribute *da, char *buf);
 static ssize_t get_reset(struct device *dev, struct device_attribute *da,
 			char *buf);
@@ -105,16 +108,19 @@ enum as7535_28xb_sys_sysfs_attrs {
 	FPGA_MINOR_VER, /* FPGA minor version */
 	CPU_CPLD_VER, /* CPU CPLD version */
 	CPU_CPLD_MINOR_VER, /* CPU CPLD minor version */
+	BIOS_FLASH_ID,
 };
 
 static SENSOR_DEVICE_ATTR(fpga_version, S_IRUGO, show_version, NULL, \
-							FPGA_VER);
+			FPGA_VER);
 static SENSOR_DEVICE_ATTR(fpga_minor_version, S_IRUGO, show_version, NULL, \
-							FPGA_MINOR_VER);
+			FPGA_MINOR_VER);
 static SENSOR_DEVICE_ATTR(cpu_cpld_version, S_IRUGO, show_version, NULL, \
-							CPU_CPLD_VER);
+			CPU_CPLD_VER);
 static SENSOR_DEVICE_ATTR(cpu_cpld_minor_version, S_IRUGO, show_version, NULL, \
-							CPU_CPLD_MINOR_VER);
+			CPU_CPLD_MINOR_VER);
+static SENSOR_DEVICE_ATTR(bios_flash_id, S_IRUGO, show_bios_flash_id, NULL, \
+			BIOS_FLASH_ID);
 
 #define DECLARE_RESET_SENSOR_DEVICE_ATTR() \
 	static SENSOR_DEVICE_ATTR(reset_mac, S_IWUSR | S_IRUGO, \
@@ -134,6 +140,7 @@ static struct attribute *as7535_28xb_sys_attributes[] = {
 	&sensor_dev_attr_fpga_minor_version.dev_attr.attr,
 	&sensor_dev_attr_cpu_cpld_version.dev_attr.attr,
 	&sensor_dev_attr_cpu_cpld_minor_version.dev_attr.attr,
+	&sensor_dev_attr_bios_flash_id.dev_attr.attr,
 	NULL
 };
 
@@ -457,6 +464,34 @@ exit:
 	return data;
 }
 
+static struct as7535_28xb_sys_data *as7535_28xb_sys_update_reg(
+			unsigned char addr, unsigned char reg)
+{
+	int status = 0;
+
+	data->valid = 0;
+
+	data->ipmi_tx_data[0] = addr;
+	data->ipmi_tx_data[1] = reg;
+	status = ipmi_send_message(&data->ipmi, IPMI_CPLD_READ_REG_CMD,
+					data->ipmi_tx_data, 2,
+					data->ipmi_resp_cpld,
+					sizeof(data->ipmi_resp_cpld));
+	if (unlikely(status != 0))
+		goto exit;
+
+	if (unlikely(data->ipmi.rx_result != 0)) {
+		status = -EIO;
+		goto exit;
+	}
+
+	data->last_updated = jiffies;
+	data->valid = 1;
+
+exit:
+	return data;
+}
+
 static ssize_t show_version(struct device *dev,
 								struct device_attribute *da, char *buf)
 {
@@ -484,6 +519,34 @@ static ssize_t show_version(struct device *dev,
 		value = data->ipmi_resp_cpld[0];
 	else if (attr->index == FPGA_MINOR_VER || attr->index == CPU_CPLD_MINOR_VER)
 		value = data->ipmi_resp_cpld[1];
+
+	mutex_unlock(&data->update_lock);
+	return sprintf(buf, "%d\n", value);
+
+exit:
+	mutex_unlock(&data->update_lock);
+	return error;
+}
+
+static ssize_t show_bios_flash_id(struct device *dev,
+				struct device_attribute *da, char *buf)
+{
+	unsigned char addr = 0x65;
+	unsigned char reg = 0x2;
+	unsigned char bit_offset = 0x4;
+	unsigned char value = 0;
+	int error = 0;
+
+	mutex_lock(&data->update_lock);
+
+	data = as7535_28xb_sys_update_reg(addr, reg);
+
+	if (!data->valid) {
+		error = -EIO;
+		goto exit;
+	}
+
+	value = ((data->ipmi_resp_cpld[0] >> bit_offset) == 1) ? 1 : 2; /*1: master, 2: slave*/
 
 	mutex_unlock(&data->update_lock);
 	return sprintf(buf, "%d\n", value);
