@@ -42,7 +42,6 @@
 
 #define IPMI_GET_CPLD_VER_CMD   0x20
 #define IPMI_GET_CPLD_CMD       0x22
-#define IPMI_GET_BIOS_FLASH_ID_CMD 0x96
 #define MAINBOARD_CPLD2_ADDR    0x61
 #define MAINBOARD_CPLD3_ADDR    0x62
 #define CPU_CPLD_ADDR           0x65
@@ -54,7 +53,7 @@ static int as9926_24db_sys_probe(struct platform_device *pdev);
 static int as9926_24db_sys_remove(struct platform_device *pdev);
 static ssize_t show_cpld_version(struct device *dev, 
 	struct device_attribute *da, char *buf);
-static ssize_t show_bios_flash_id(struct device *dev, struct device_attribute *da, char *buf);
+static ssize_t show_cpld_value(struct device *dev, struct device_attribute *da, char *buf);
 
 struct ipmi_data {
 	struct completion   read_complete;
@@ -82,7 +81,6 @@ struct as9926_24db_sys_data {
 	unsigned char    ipmi_resp_eeprom[EEPROM_SIZE];
 	unsigned char    ipmi_resp_cpld;
 	unsigned char    ipmi_tx_data[3];
-	unsigned char    ipmi_bios_flash_id;
 	struct bin_attribute eeprom;      /* eeprom data */
 };
 
@@ -116,8 +114,7 @@ static SENSOR_DEVICE_ATTR(fan_cpld_ver, S_IRUGO, show_cpld_version,
 			  NULL, FAN_CPLD_VER);
 static SENSOR_DEVICE_ATTR(fpga_cpld_ver, S_IRUGO, show_cpld_version, 
 			  NULL, FPGA_CPLD_VER);
-static SENSOR_DEVICE_ATTR(bios_flash_id, S_IRUGO, show_bios_flash_id,
-              NULL, BIOS_FLASH_ID);
+static SENSOR_DEVICE_ATTR(bios_flash_id, S_IRUGO, show_cpld_value, NULL, BIOS_FLASH_ID);
 
 static struct attribute *as9926_24db_sys_attributes[] = {
 	&sensor_dev_attr_mb_cpld2_ver.dev_attr.attr,
@@ -357,16 +354,17 @@ exit:
 }
 
 static struct as9926_24db_sys_data *
-as9926_24db_sys_update_bios_flash_id(unsigned char bios_flash_id_cmd)
+as9926_24db_sys_update_cpld_val(unsigned char cpld_addr, unsigned char cpld_offset)
 {
     int status = 0;
 
     data->valid = 0;
-    //data->ipmi_tx_data[0] = cpld_addr;
-    status = ipmi_send_message(&data->ipmi, bios_flash_id_cmd,
-                                data->ipmi_tx_data, 0,
-                                &data->ipmi_bios_flash_id,
-                                sizeof(data->ipmi_bios_flash_id));
+    data->ipmi_tx_data[0] = cpld_addr;
+    data->ipmi_tx_data[1] = cpld_offset;
+    status = ipmi_send_message(&data->ipmi, IPMI_GET_CPLD_CMD,
+                                data->ipmi_tx_data, 2,
+                                &data->ipmi_resp_cpld,
+                                sizeof(data->ipmi_resp_cpld));
 
     if (unlikely(status != 0))
         goto exit;
@@ -427,21 +425,38 @@ exit:
 	return error;    
 }
 
-static ssize_t show_bios_flash_id(struct device *dev, struct device_attribute *da, char *buf)
+static ssize_t show_cpld_value(struct device *dev, struct device_attribute *da, char *buf)
 {
-    unsigned char bios_flash_id_addr = 0, value = 0;
+    struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
+    unsigned char cpld_addr = 0, cpld_offset = 0;
+    unsigned char mask = 0, value = 0;
     int error = 0;
+
+    switch (attr->index) {
+    case BIOS_FLASH_ID:
+        cpld_addr = CPU_CPLD_ADDR;
+        cpld_offset = 0x2;
+        mask = (1 << 4);
+        break;
+    default:
+        return -EINVAL;
+    }
 
     mutex_lock(&data->update_lock);
 
-    data = as9926_24db_sys_update_bios_flash_id(IPMI_GET_BIOS_FLASH_ID_CMD);
+    data = as9926_24db_sys_update_cpld_val(cpld_addr, cpld_offset);
     if (!data->valid) {
         error = -EIO;
         goto exit;
     }
 
-    value = data->ipmi_bios_flash_id;
+    value = data->ipmi_resp_cpld;
     mutex_unlock(&data->update_lock);
+
+    if( (attr->index) == BIOS_FLASH_ID ) {
+        return sprintf(buf, "%d\n", (value & mask) ? 1 : 2);
+    }
+
     return sprintf(buf, "%d\n", value);
 
 exit:
