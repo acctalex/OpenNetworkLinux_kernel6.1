@@ -101,7 +101,8 @@ enum as4625_cpld_sysfs_attributes {
 	TRANSCEIVER_TXFAULT_ATTR_ID(51),
 	TRANSCEIVER_TXFAULT_ATTR_ID(52),
 	TRANSCEIVER_TXFAULT_ATTR_ID(53),
-	TRANSCEIVER_TXFAULT_ATTR_ID(54)
+	TRANSCEIVER_TXFAULT_ATTR_ID(54),
+    BIOS_FLASH_ID
 };
 
 /* sysfs attributes for hwmon
@@ -118,6 +119,8 @@ static ssize_t access(struct device *dev, struct device_attribute *da,
 			const char *buf, size_t count);
 static ssize_t show_version(struct device *dev, struct device_attribute *da,
 			 char *buf);
+static ssize_t show_bios_flash_id(struct device *dev, struct device_attribute *da,
+             char *buf);
 static int as4625_cpld_read_internal(struct i2c_client *client, u8 reg);
 static int as4625_cpld_write_internal(struct i2c_client *client, u8 reg, 
 					u8 value);
@@ -138,6 +141,7 @@ static SENSOR_DEVICE_ATTR(version_major, S_IRUGO, show_version, NULL, VERSION_MA
 static SENSOR_DEVICE_ATTR(version_minor, S_IRUGO, show_version, NULL, VERSION_MINOR);
 static SENSOR_DEVICE_ATTR(pcb_id, S_IRUGO, show_version, NULL, PCB_ID);
 static SENSOR_DEVICE_ATTR(pcb_version, S_IRUGO, show_version, NULL, PCB_VERSION);
+static SENSOR_DEVICE_ATTR(bios_flash_id, S_IRUGO, show_bios_flash_id, NULL, BIOS_FLASH_ID);
 static SENSOR_DEVICE_ATTR(pwr_enable_mb, S_IRUGO | S_IWUSR, show_status, set_control, POWER_ENABLE_MAINBOARD);
 static SENSOR_DEVICE_ATTR(pwr_enable_poe, S_IRUGO | S_IWUSR, show_status, set_control, POWER_ENABLE_POE);
 static SENSOR_DEVICE_ATTR(thermal_shutdown, S_IRUGO | S_IWUSR, show_status, set_control, SYSTEM_THERMAL_SHUTDOWN);
@@ -165,6 +169,7 @@ static struct attribute *as4625_cpld1_attributes[] = {
 	&sensor_dev_attr_pwr_enable_poe.dev_attr.attr,
 	&sensor_dev_attr_thermal_shutdown.dev_attr.attr,
 	&sensor_dev_attr_access.dev_attr.attr,
+    &sensor_dev_attr_bios_flash_id.dev_attr.attr,
 	/* transceiver attributes */
 	&sensor_dev_attr_module_present_all.dev_attr.attr,
 	&sensor_dev_attr_module_rx_los_all.dev_attr.attr,
@@ -473,6 +478,40 @@ static ssize_t show_version(struct device *dev, struct device_attribute *da,
 		val &= 0x7; /* bit 0-2 */
 
 	return sprintf(buf, "%d\n", val);
+}
+
+static ssize_t show_bios_flash_id(struct device *dev, struct device_attribute *da,
+             char *buf)
+{
+    struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
+    struct i2c_client *client = to_i2c_client(dev);
+    struct as4625_cpld_data *data = i2c_get_clientdata(client);
+    int status = 0, val = 0;;
+    u8 reg = 0, mask = 0;
+
+    switch (attr->index) {
+        case BIOS_FLASH_ID:
+            reg  = 0x24;
+            mask = 0x3;
+            break;
+        default:
+            return 0;
+    }
+
+    mutex_lock(&data->update_lock);
+    status = as4625_cpld_read_internal(client, reg);
+
+    if (unlikely(status < 0)) {
+        goto exit;
+    }
+    mutex_unlock(&data->update_lock);
+
+    val = ((status & mask) == 0x0) ? 1 : 2;
+    return sprintf(buf, "%d\n", val);
+
+exit:
+    mutex_unlock(&data->update_lock);
+    return status;
 }
 
 /*
