@@ -36,6 +36,7 @@ static struct as7712_32x_fan_data *as7712_32x_fan_update_device(struct device *d
 static ssize_t fan_show_value(struct device *dev, struct device_attribute *da, char *buf);
 static ssize_t set_duty_cycle(struct device *dev, struct device_attribute *da,
             const char *buf, size_t count);
+static ssize_t show_version(struct device *dev, struct device_attribute *da, char *buf);
 extern int accton_i2c_cpld_read(unsigned short cpld_addr, u8 reg);
 extern int accton_i2c_cpld_write(unsigned short cpld_addr, u8 reg, u8 value);
 
@@ -110,7 +111,8 @@ enum sysfs_fan_attributes {
     FAN3_FAULT,
     FAN4_FAULT,
     FAN5_FAULT,
-    FAN6_FAULT
+    FAN6_FAULT,
+    CPLD_VERSION
 };
 
 /* Define attributes
@@ -168,6 +170,8 @@ DECLARE_FAN_DIRECTION_SENSOR_DEV_ATTR(6);
 /* 1 fan duty cycle attribute in this platform */
 DECLARE_FAN_DUTY_CYCLE_SENSOR_DEV_ATTR();
 
+static SENSOR_DEVICE_ATTR(version, S_IRUGO, show_version, NULL, CPLD_VERSION);
+
 static struct attribute *as7712_32x_fan_attributes[] = {
     /* fan related attributes */
     DECLARE_FAN_FAULT_ATTR(1),
@@ -195,6 +199,7 @@ static struct attribute *as7712_32x_fan_attributes[] = {
     DECLARE_FAN_DIRECTION_ATTR(5),
     DECLARE_FAN_DIRECTION_ATTR(6),
     DECLARE_FAN_DUTY_CYCLE_ATTR(),
+    &sensor_dev_attr_version.dev_attr.attr,
     NULL
 };
 
@@ -367,6 +372,37 @@ static ssize_t fan_show_value(struct device *dev, struct device_attribute *da,
     mutex_unlock(&data->update_lock);
 
     return ret;
+}
+
+static ssize_t show_version(struct device *dev, struct device_attribute *da,
+             char *buf)
+{
+    u8 reg = 0, mask = 0;
+    struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
+    struct i2c_client *client = to_i2c_client(dev);
+    struct as7712_32x_fan_data *data = i2c_get_clientdata(client);
+    int status = 0;
+
+    switch (attr->index) {
+    case CPLD_VERSION:
+        reg  = 0x1;
+        mask = 0xFF;
+        break;
+    default:
+        break;
+    }
+
+    mutex_lock(&data->update_lock);
+    status = as7712_32x_fan_read_value(client, reg);
+    if (unlikely(status < 0)) {
+        goto exit;
+    }
+    mutex_unlock(&data->update_lock);
+    return sprintf(buf, "%d\n", (status & mask));
+
+exit:
+    mutex_unlock(&data->update_lock);
+    return status;
 }
 
 static const struct attribute_group as7712_32x_fan_group = {

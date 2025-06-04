@@ -56,7 +56,14 @@ static ssize_t show_version(struct device *dev, struct device_attribute *da,
 static int as7712_32x_cpld_read_internal(struct i2c_client *client, u8 reg);
 static int as7712_32x_cpld_write_internal(struct i2c_client *client, u8 reg, u8 value);
 
+enum cpld_type {
+    as7712_32x_cpld1,
+    as7712_32x_cpld2,
+    as7712_32x_cpld3
+};
+
 struct as7712_32x_cpld_data {
+    enum cpld_type     type;
     struct device      *hwmon_dev;
     struct mutex        update_lock;
 };
@@ -105,6 +112,14 @@ enum as7712_32x_cpld_sysfs_attributes {
 	TRANSCEIVER_PRESENT_ATTR_ID(31),
 	TRANSCEIVER_PRESENT_ATTR_ID(32),
 };
+
+static const struct i2c_device_id as7712_32x_cpld_id[] = {
+    { "as7712_32x_cpld1", as7712_32x_cpld1 },
+    { "as7712_32x_cpld2", as7712_32x_cpld2 },
+    { "as7712_32x_cpld3", as7712_32x_cpld3 },
+    {}
+};
+MODULE_DEVICE_TABLE(i2c, as7712_32x_cpld_id);
 
 /* sysfs attributes for hwmon 
  */
@@ -191,8 +206,26 @@ static struct attribute *as7712_32x_cpld_attributes[] = {
 	NULL
 };
 
+static struct attribute *as7712_32x_cpld2_attributes[] = {
+    &sensor_dev_attr_version.dev_attr.attr,
+    NULL
+};
+
+static struct attribute *as7712_32x_cpld3_attributes[] = {
+    &sensor_dev_attr_version.dev_attr.attr,
+    NULL
+};
+
 static const struct attribute_group as7712_32x_cpld_group = {
 	.attrs = as7712_32x_cpld_attributes,
+};
+
+static const struct attribute_group as7712_32x_cpld2_group = {
+    .attrs = as7712_32x_cpld2_attributes,
+};
+
+static const struct attribute_group as7712_32x_cpld3_group = {
+    .attrs = as7712_32x_cpld3_attributes,
 };
 
 static ssize_t show_present_all(struct device *dev, struct device_attribute *da,
@@ -436,7 +469,9 @@ static int as7712_32x_cpld_probe(struct i2c_client *client,
             const struct i2c_device_id *dev_id)
 {
     int status;
+    int ret = -ENODEV;
 	struct as7712_32x_cpld_data *data = NULL;
+    const struct attribute_group *group = NULL;
 
     if (!i2c_check_functionality(client->adapter, I2C_FUNC_SMBUS_BYTE_DATA)) {
         dev_dbg(&client->dev, "i2c_check_functionality failed (0x%x)\n", client->addr);
@@ -454,11 +489,30 @@ static int as7712_32x_cpld_probe(struct i2c_client *client,
     mutex_init(&data->update_lock);
     dev_info(&client->dev, "chip found\n");
 
-	/* Register sysfs hooks */
-	status = sysfs_create_group(&client->dev.kobj, &as7712_32x_cpld_group);
-	if (status) {
-		goto exit_free;
-	}
+    data->type = dev_id->driver_data;
+
+    /* Register sysfs hooks */
+    switch (data->type) {
+    case as7712_32x_cpld1:
+        group = &as7712_32x_cpld_group;
+        break;
+    case as7712_32x_cpld2:
+        group = &as7712_32x_cpld2_group;
+        break;
+    case as7712_32x_cpld3:
+        group = &as7712_32x_cpld3_group;
+        break;
+    default:
+        break;
+    }
+
+    if (group) {
+        /* Register sysfs hooks */
+        ret = sysfs_create_group(&client->dev.kobj, group);
+        if (ret) {
+            goto exit_free;
+        }
+    }
 
     data->hwmon_dev = hwmon_device_register_with_info(&client->dev, "as7712_32x_cpld",
                                                 NULL, 
@@ -543,12 +597,6 @@ int as7712_32x_cpld_write(unsigned short cpld_addr, u8 reg, u8 value)
 	return ret;
 }
 EXPORT_SYMBOL(as7712_32x_cpld_write);
-
-static const struct i2c_device_id as7712_32x_cpld_id[] = {
-    { "as7712_32x_cpld1", 0 },
-    {}
-};
-MODULE_DEVICE_TABLE(i2c, as7712_32x_cpld_id);
 
 static struct i2c_driver as7712_32x_cpld_driver = {
     .class        = I2C_CLASS_HWMON,
