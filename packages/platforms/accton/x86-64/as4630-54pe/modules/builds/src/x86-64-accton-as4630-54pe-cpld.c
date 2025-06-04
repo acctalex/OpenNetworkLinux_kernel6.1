@@ -66,7 +66,7 @@ enum cpld_type {
 enum fan_id {
     FAN1_ID,
     FAN2_ID,
-    FAN3_ID,   
+    FAN3_ID,
 };
 
 static const u8 fan_reg[] = {   
@@ -111,6 +111,7 @@ MODULE_DEVICE_TABLE(i2c, as4630_54pe_cpld_id);
 enum as4630_54pe_cpld_sysfs_attributes {
 	CPLD_VERSION,
 	CPLD_MINOR_VERSION,
+	BIOS_FLASH_ID,
 	ACCESS,
 	/* transceiver attributes */
 	TRANSCEIVER_RXLOS_ATTR_ID(49),
@@ -162,6 +163,8 @@ static ssize_t access(struct device *dev, struct device_attribute *da,
 			const char *buf, size_t count);
 static ssize_t show_version(struct device *dev, struct device_attribute *da,
              char *buf);
+static ssize_t show_bios_flash_id(struct device *dev, struct device_attribute *da,
+		char *buf);
 static int as4630_54pe_cpld_read_internal(struct i2c_client *client, u8 reg);
 static int as4630_54pe_cpld_write_internal(struct i2c_client *client, u8 reg, u8 value);
 
@@ -173,11 +176,11 @@ static ssize_t set_duty_cycle(struct device *dev, struct device_attribute *da,
 
 /* transceiver attributes */
 #define DECLARE_SFP_TRANSCEIVER_SENSOR_DEVICE_ATTR(index) \
-    static SENSOR_DEVICE_ATTR(module_present_##index, S_IRUGO, show_status, NULL, MODULE_PRESENT_##index); \
+	static SENSOR_DEVICE_ATTR(module_present_##index, S_IRUGO, show_status, NULL, MODULE_PRESENT_##index); \
 	static SENSOR_DEVICE_ATTR(module_tx_disable_##index, S_IRUGO | S_IWUSR, show_status, set_tx_disable, MODULE_TXDISABLE_##index); \
 	static SENSOR_DEVICE_ATTR(module_rx_los_##index, S_IRUGO, show_status, NULL, MODULE_RXLOS_##index);  \
 	static SENSOR_DEVICE_ATTR(module_tx_fault_##index, S_IRUGO, show_status, NULL, MODULE_TXFAULT_##index); 
-	
+
 #define DECLARE_SFP_TRANSCEIVER_ATTR(index)  \
     &sensor_dev_attr_module_present_##index.dev_attr.attr, \
 	&sensor_dev_attr_module_tx_disable_##index.dev_attr.attr, \
@@ -200,7 +203,7 @@ static ssize_t set_duty_cycle(struct device *dev, struct device_attribute *da,
     static SENSOR_DEVICE_ATTR(fan_fault_##index,   S_IRUGO, fan_show_value, NULL, FAN_FAULT_##index); \
     static SENSOR_DEVICE_ATTR(fan_speed_rpm_##index, S_IRUGO, fan_show_value, NULL, FAN_SPEED_RPM_##index); \
     static SENSOR_DEVICE_ATTR(fan_direction_##index, S_IRUGO, fan_show_value, NULL, FAN_DIRECTION_##index);
-    
+
 #define DECLARE_FAN_ATTR(index)  \
     &sensor_dev_attr_fan_present_##index.dev_attr.attr, \
     &sensor_dev_attr_fan_fault_##index.dev_attr.attr, \
@@ -213,6 +216,7 @@ static ssize_t set_duty_cycle(struct device *dev, struct device_attribute *da,
 
 static SENSOR_DEVICE_ATTR(version, S_IRUGO, show_version, NULL, CPLD_VERSION);
 static SENSOR_DEVICE_ATTR(minor_version, S_IRUGO, show_version, NULL, CPLD_MINOR_VERSION);
+static SENSOR_DEVICE_ATTR(bios_flash_id, S_IRUGO, show_bios_flash_id, NULL, BIOS_FLASH_ID);
 static SENSOR_DEVICE_ATTR(access, S_IWUSR, NULL, access, ACCESS);
 
 
@@ -250,6 +254,7 @@ static struct attribute *as4630_54pe_cpld_attributes[] = {
 static struct attribute *as4630_54pe_cpucpld_attributes[] = {
 	&sensor_dev_attr_version.dev_attr.attr,
 	&sensor_dev_attr_minor_version.dev_attr.attr,
+	&sensor_dev_attr_bios_flash_id.dev_attr.attr,
 	&sensor_dev_attr_access.dev_attr.attr,
 	NULL
 };
@@ -567,6 +572,16 @@ static ssize_t show_version(struct device *dev, struct device_attribute *da, cha
 	return sprintf(buf, "%d\n", val);
 }
 
+static ssize_t show_bios_flash_id(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	int val = 0;
+	struct i2c_client *client = to_i2c_client(dev);
+
+	val = i2c_smbus_read_byte_data(client, 0x11);
+
+	return sprintf(buf, "%d\n", ( ((val >> 2) & 0x1) == 1 ) ? 1 : 2); /*(BIT2) 1: master, 2: slave*/
+}
+
 /* fan utility functions
  */
 static u32 reg_val_to_duty_cycle(u8 reg_val)
@@ -631,7 +646,6 @@ static u8 is_fan_fault(struct as4630_54pe_cpld_data *data, enum fan_id id)
      */
     if (reg_val_to_speed_rpm(data->reg_fan_val[id+3]))
     {
-           
         ret = 0;
     }
 
