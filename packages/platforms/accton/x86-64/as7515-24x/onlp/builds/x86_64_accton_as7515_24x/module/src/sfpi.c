@@ -54,8 +54,8 @@
 
 #define NUM_OF_SFP_PORT 24
 static const int port_bus_index[NUM_OF_SFP_PORT] = {
-    14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
-    26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37
+    15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
+    27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38
 };
 
 #define PORT_BUS_INDEX(port) (port_bus_index[port])
@@ -222,13 +222,10 @@ onlp_sfpi_eeprom_read(int port, uint8_t data[256])
      * Return MISSING if SFP is missing.
      * Return OK if eeprom is read
      */
-    int size = 0, bus_offset = 0;
+    int size = 0;
     memset(data, 0, 256);
 
-    if(get_i2c_bus_offset(&bus_offset) != ONLP_STATUS_OK)
-        return ONLP_STATUS_E_INTERNAL;
-
-    if(onlp_file_read(data, 256, &size, MODULE_EEPROM_FORMAT, PORT_BUS_INDEX(port)+bus_offset) != ONLP_STATUS_OK) {
+    if(onlp_file_read(data, 256, &size, MODULE_EEPROM_FORMAT, PORT_BUS_INDEX(port)) != ONLP_STATUS_OK) {
         AIM_LOG_ERROR("Unable to read eeprom from port(%d)\r\n", port);
         return ONLP_STATUS_E_INTERNAL;
     }
@@ -246,12 +243,8 @@ onlp_sfpi_dom_read(int port, uint8_t data[256])
 {
     FILE* fp;
     char file[64] = {0};
-    int bus_offset = 0;
 
-    if(get_i2c_bus_offset(&bus_offset) != ONLP_STATUS_OK)
-        return ONLP_STATUS_E_INTERNAL;
-
-    sprintf(file, MODULE_EEPROM_FORMAT, PORT_BUS_INDEX(port)+bus_offset);
+    sprintf(file, MODULE_EEPROM_FORMAT, PORT_BUS_INDEX(port));
     fp = fopen(file, "r");
     if(fp == NULL) {
         AIM_LOG_ERROR("Unable to open the eeprom device file of port(%d)", port);
