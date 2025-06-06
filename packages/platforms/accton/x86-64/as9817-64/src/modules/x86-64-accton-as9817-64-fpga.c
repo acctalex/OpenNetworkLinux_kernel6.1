@@ -812,7 +812,8 @@ static ssize_t status_read(struct device *dev, struct device_attribute *da, char
             break;
         case BIOS_FLASH_ID:
             bios_flash_id = ioread8(fpga_ctl->pci_fpga_dev.data_base_addr0 + FPGA_BIOS_BOOT_REG);
-            ret = sprintf(buf, "%d\n", ((bios_flash_id & 0x3)==0) ? 1 : 2 );
+            /* [BIT1 BIT0]: 2'b00: Primary, 2'b11: Backup*/
+            ret = sprintf(buf, "%d\n", ((bios_flash_id & 0x3) == 0) ? 1 : ((bios_flash_id & 0x3) == 0x3) ? 2 : 0 );
             break;
         default:
             break;
