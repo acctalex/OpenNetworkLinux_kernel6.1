@@ -44,10 +44,6 @@
 #define BMC_FILE_RETRY_COUNT 3             // Retry count for file read/write operations
 #define BMC_FILE_RETRY_DELAY_US 1000000    // Delay between retries (in microseconds, 1s)
 
-#define BMC_VER1_PATH  "/sys/devices/platform/ipmi_bmc.0/firmware_revision"
-#define BMC_VER2_PATH  "/sys/devices/platform/ipmi_bmc.0/aux_firmware_revision"
-#define BIOS_VER_PATH  "/sys/devices/virtual/dmi/id/bios_version"
-
 typedef struct temp_reader_data {
     int data;
     int index;
@@ -200,15 +196,6 @@ onlp_sysi_platform_info_get(onlp_platform_info_t* pi)
 {
     int i, len, ret = ONLP_STATUS_OK;
     char *v[NUM_OF_CPLD_VER] = {NULL};
-    onlp_onie_info_t onie;
-    char *bios_ver = NULL;
-    char *bmc_buf = NULL;
-    char *aux_buf = NULL;
-    int bmc_major = 0, bmc_minor = 0;
-    unsigned int bmc_aux[4] = {0};
-    char bmc_ver[16] = "";
-    const char *bios = "";
-    const char *onie_ver = "";
 
     for (i = 0; i < AIM_ARRAYSIZE(cpld_ver_path); i++) {
         if (i == 3) {
@@ -232,50 +219,14 @@ onlp_sysi_platform_info_get(onlp_platform_info_t* pi)
     }
 
     if (ret == ONLP_STATUS_OK) {
-        pi->cpld_versions = aim_fstrdup("\r\n\t   FPGA:%s"
-                                        "\r\n\t   CPLD-1:%s"
-                                        "\r\n\t   CPLD-2:%s"
-                                        "\r\n\t   Fan CPLD:%s",
+        pi->cpld_versions = aim_fstrdup("\r\nFPGA:%s\r\nCPLD-1:%s"
+                                        "\r\nCPLD-2:%s\r\nFan CPLD:%s",
                                         v[0], v[1], v[2], v[3]);
     }
 
     for (i = 0; i < AIM_ARRAYSIZE(v); i++) {
         AIM_FREE_IF_PTR(v[i]);
     }
-
-    if ((onlp_file_read_str(&bmc_buf, BMC_VER1_PATH) >= 0) &&
-        (onlp_file_read_str(&aux_buf, BMC_VER2_PATH) >= 0))
-    {
-        bmc_buf[strcspn(bmc_buf, "\n")] = '\0';
-        aux_buf[strcspn(aux_buf, "\n")] = '\0';
-
-        /*
-         * NOTE: The value in /sys/devices/platform/ipmi_bmc.0/firmware_revision is formatted
-         * using "%u.%x" in the kernel driver (see ipmi_msghandler.c::firmware_revision_show).
-         * The second field (after the dot) is output in hexadecimal format and must be parsed
-         * using "%x" from user-space.
-         */
-        if (sscanf(bmc_buf, "%u.%x", &bmc_major, &bmc_minor) == 2 &&
-            sscanf(aux_buf, "0x%x 0x%x 0x%x 0x%x", &bmc_aux[0], &bmc_aux[1], &bmc_aux[2], &bmc_aux[3]) == 4)
-        {
-            snprintf(bmc_ver, sizeof(bmc_ver), "%02X.%02X.%02X",
-                     bmc_major, bmc_minor, bmc_aux[3]);
-        }
-    }
-
-    if (onlp_file_read_str(&bios_ver, BIOS_VER_PATH) > 0) {
-        bios = bios_ver;
-    }
-    if (onlp_onie_decode_file(&onie, IDPROM_PATH) >= 0) {
-        onie_ver = onie.onie_version;
-    }
-    pi->other_versions = aim_fstrdup("\r\n\t   BIOS: %s\r\n\t   ONIE: %s\r\n\t   BMC: %s",
-                                     bios, onie_ver, bmc_ver);
-
-    AIM_FREE_IF_PTR(bmc_buf);
-    AIM_FREE_IF_PTR(aux_buf);
-    AIM_FREE_IF_PTR(bios_ver);
-    onlp_onie_info_free(&onie);
 
     return ret;
 }
@@ -284,7 +235,6 @@ void
 onlp_sysi_platform_info_free(onlp_platform_info_t* pi)
 {
     aim_free(pi->cpld_versions);
-    aim_free(pi->other_versions);
 }
 
 int onlp_sysi_get_cpu_temp(temp_reader_data_t *temp)
