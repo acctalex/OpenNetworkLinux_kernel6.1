@@ -110,16 +110,14 @@ int
 onlp_sysi_onie_data_get(uint8_t** data, int* size)
 {
     uint8_t* rdata = aim_zmalloc(256);
-    int bus_offset = 0;
 
-    if(get_i2c_bus_offset(&bus_offset) == ONLP_STATUS_OK) {
-        if (onlp_file_read(rdata, 256, size, IDPROM_PATH, 4+bus_offset) == ONLP_STATUS_OK) {
-            if(*size == 256) {
-                *data = rdata;
-                return ONLP_STATUS_OK;
-            }
+    if (onlp_file_read(rdata, 256, size, IDPROM_PATH) == ONLP_STATUS_OK) {
+        if(*size == 256) {
+            *data = rdata;
+               return ONLP_STATUS_OK;
         }
     }
+    
 
     aim_free(rdata);
     *size = 0;
@@ -165,10 +163,6 @@ onlp_sysi_platform_info_get(onlp_platform_info_t* pi)
     char onie_version[15];
     uint8_t* eeprom_data = NULL;
     int size;
-    int bus_offset = 0;
-
-    if(get_i2c_bus_offset(&bus_offset) != ONLP_STATUS_OK)
-        return ONLP_STATUS_E_INTERNAL;
 
     for (i = 0; i < AIM_ARRAYSIZE(cpld_ver_path); i++) {
         if (i == 2) {
@@ -179,10 +173,10 @@ onlp_sysi_platform_info_get(onlp_platform_info_t* pi)
                 break;
             }
 
-            len = onlp_file_read_str(&v[i], FAN_SYSFS_FORMAT_1, 8+bus_offset, hwmon_idx, "version");
+            len = onlp_file_read_str(&v[i], FAN_SYSFS_FORMAT_1, hwmon_idx, "version");
         }
         else if (i == 1) {
-            len = onlp_file_read_str(&v[i], cpld_ver_path[i], 2+bus_offset);
+            len = onlp_file_read_str(&v[i], cpld_ver_path[i], 3);
         }
         else {
             len = onlp_file_read_str(&v[i], cpld_ver_path[i]);
@@ -209,7 +203,7 @@ onlp_sysi_platform_info_get(onlp_platform_info_t* pi)
     if (ret == ONLP_STATUS_OK) {
         pi->cpld_versions = aim_fstrdup("\r\n\t   FPGA: %s"
                                         "\r\n\t   CPLD: %s"
-                                        "\r\n\t   Fan CPLD: %s"
+                                        "\r\n\t   Fan CPLD: %s\r\n"
                                         , v[0], v[1], v[2]);
     }
 

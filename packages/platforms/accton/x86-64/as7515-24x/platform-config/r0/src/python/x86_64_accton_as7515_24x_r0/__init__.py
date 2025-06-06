@@ -31,42 +31,42 @@ class OnlPlatform_x86_64_accton_as7515_24x_r0(OnlPlatformAccton,
         ########### initialize I2C bus 0 ###########
         self.new_i2c_devices([
                 # initialize FPGA
-                ('as7515_fpga_mux', 0x77, 0+bus_offset), # i2c 1-13
+                ('as7515_fpga_mux', 0x77, 0+bus_offset),
 
                 # initialize CPLD
-                ('as7515_24x_cpld', 0x61, 2+bus_offset),
-                ('as7515_cpld_mux', 0x74, 2+bus_offset), # i2c 14-37
+                ('as7515_24x_cpld', 0x61, 3),
+                ('as7515_cpld_mux', 0x74, 3),
 
                 # initialize Thermal Sensor
-                ('tmp431', 0x4C, 1+bus_offset),
-                ('lm75', 0x49, 13+bus_offset),
-                ('lm75', 0x4A, 13+bus_offset),
-                ('lm75', 0x4C, 13+bus_offset),
-                ('lm75', 0x4D, 13+bus_offset),
+                ('tmp431', 0x4C, 2),
+                ('lm75', 0x49, 14),
+                ('lm75', 0x4A, 14),
+                ('lm75', 0x4C, 14),
+                ('lm75', 0x4D, 14),
 
                 # initiate PSU
-                ('as7515_24x_psu1', 0x52, 6+bus_offset),
-                ('ym2401', 0x5A, 6+bus_offset),
-                ('as7515_24x_psu2', 0x50, 7+bus_offset),
-                ('ym2401', 0x58, 7+bus_offset),
+                ('as7515_24x_psu1', 0x52, 7),
+                ('ym2401', 0x5A, 7),
+                ('as7515_24x_psu2', 0x50, 8),
+                ('ym2401', 0x58, 8),
 
                 # initiate FAN
-                ('as7515_24x_fan', 0x66, 8+bus_offset),
+                ('as7515_24x_fan', 0x66, 9),
 
                 # initiate sys-eeprom
-                ('24c64', 0x56, 4+bus_offset),
+                ('24c64', 0x56, 5),
                 ])
 
         subprocess.call('echo 0 > /sys/devices/platform/as7515_24x_sfp/module_reset_all', shell=True)
 
         # initialize SFP/QSFP
         sfp_bus = [
-            14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
-            26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37
+            15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
+            27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38
         ]
         for port in range(0, len(sfp_bus)):
-            self.new_i2c_device('optoe1' if (port < 4) else 'optoe2', 0x50, sfp_bus[port]+bus_offset)
-            subprocess.call('echo port%d > /sys/bus/i2c/devices/%d-0050/port_name' % (port, sfp_bus[port]+bus_offset), shell=True)
+            self.new_i2c_device('optoe1' if (port < 4) else 'optoe2', 0x50, sfp_bus[port])
+            subprocess.call('echo port%d > /sys/bus/i2c/devices/%d-0050/port_name' % (port, sfp_bus[port]), shell=True)
 
         # initialize LED
         subprocess.call('echo 0 > /sys/devices/platform/as7515_24x_led/led_loc', shell=True)
