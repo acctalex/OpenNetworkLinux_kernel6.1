@@ -59,6 +59,7 @@
 
 #define FPGA_PCIE_START_OFFSET         0x0000
 #define FPGA_BOARD_INFO_REG            (FPGA_PCIE_START_OFFSET + 0x00)
+#define FPGA_BIOS_BOOT_REG             (FPGA_PCIE_START_OFFSET + 0x35)
 #define FPGA_MAC_MIN_TEMP1_REG         (FPGA_PCIE_START_OFFSET + 0xA0)
 #define FPGA_MAC_MIN_TEMP2_REG         (FPGA_PCIE_START_OFFSET + 0xA1)
 #define FPGA_MAC_MIN_TEMP3_REG         (FPGA_PCIE_START_OFFSET + 0xA2)
@@ -373,7 +374,8 @@ enum fpga_sysfs_attributes {
     CPLD2_REG,
     PLATFORM_ID,
     MAC_MIN_TEMP,
-    MAC_MAX_TEMP
+    MAC_MAX_TEMP,
+    BIOS_FLASH_ID
 };
 
 
@@ -481,6 +483,7 @@ static SENSOR_DEVICE_ATTR(cpld2_reg, S_IRUGO|S_IWUSR, reg_read, reg_write, CPLD2
 static SENSOR_DEVICE_ATTR(platform_id, S_IRUGO, status_read, NULL, PLATFORM_ID);
 static SENSOR_DEVICE_ATTR(mac_min_temp, S_IRUGO, status_read, NULL, MAC_MIN_TEMP);
 static SENSOR_DEVICE_ATTR(mac_max_temp, S_IRUGO, status_read, NULL, MAC_MAX_TEMP);
+static SENSOR_DEVICE_ATTR(bios_flash_id, S_IRUGO, status_read, NULL, BIOS_FLASH_ID);
 
 static struct attribute *fpga_transceiver_attributes[] = {
     DECLARE_TRANSCEIVER_ATTR(1),
@@ -563,6 +566,7 @@ static struct attribute *fpga_transceiver_attributes[] = {
     &sensor_dev_attr_platform_id.dev_attr.attr,
     &sensor_dev_attr_mac_min_temp.dev_attr.attr,
     &sensor_dev_attr_mac_max_temp.dev_attr.attr,
+    &sensor_dev_attr_bios_flash_id.dev_attr.attr,
     NULL
 };
 
@@ -733,6 +737,7 @@ static ssize_t status_read(struct device *dev, struct device_attribute *da, char
     u8 major, minor, reg_val;
     u8 bits_shift;
     u8 mac_temp_val[4];
+    u8 bios_flash_id;
 
     switch(attr->index)
     {
@@ -746,7 +751,7 @@ static ssize_t status_read(struct device *dev, struct device_attribute *da, char
                               SPI_BUSY_MASK_CPLD1);
             UNLOCK(&cpld_access_lock);
 
-            ret = sprintf(buf, "%d.%d\n", major, minor);
+            ret = sprintf(buf, "%x.%x\n", major, minor);
             break;
         case CPLD2_VERSION:
             LOCK(&cpld_access_lock);
@@ -758,7 +763,7 @@ static ssize_t status_read(struct device *dev, struct device_attribute *da, char
                               SPI_BUSY_MASK_CPLD2);
             UNLOCK(&cpld_access_lock);
 
-            ret = sprintf(buf, "%d.%d\n", major, minor);
+            ret = sprintf(buf, "%x.%x\n", major, minor);
             break;
         case MODULE_PRESENT_1 ... MODULE_RX_LOS_66:
             reg = attribute_mappings[attr->index].reg;
@@ -804,6 +809,11 @@ static ssize_t status_read(struct device *dev, struct device_attribute *da, char
             ret = sprintf(buf, "%02x %02x %02x %02x\n", 
                                mac_temp_val[0], mac_temp_val[1], 
                                mac_temp_val[2], mac_temp_val[3]);
+            break;
+        case BIOS_FLASH_ID:
+            bios_flash_id = ioread8(fpga_ctl->pci_fpga_dev.data_base_addr0 + FPGA_BIOS_BOOT_REG);
+            /* [BIT1 BIT0]: 2'b00: Primary, 2'b11: Backup*/
+            ret = sprintf(buf, "%d\n", ((bios_flash_id & 0x3) == 0) ? 1 : ((bios_flash_id & 0x3) == 0x3) ? 2 : 0 );
             break;
         default:
             break;
