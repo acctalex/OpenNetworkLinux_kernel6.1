@@ -322,7 +322,7 @@ static ssize_t show_version(struct device *dev,
     major = data->ipmi_resp_cpld[0];
     minor = data->ipmi_resp_cpld[1];
     mutex_unlock(&data->update_lock);
-    return sprintf(buf, "%x.%x\n", major, minor);
+    return sprintf(buf, "%d.%d\n", major, minor);
 
 exit:
     mutex_unlock(&data->update_lock);
