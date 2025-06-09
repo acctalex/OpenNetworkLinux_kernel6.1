@@ -39,16 +39,16 @@
 static char* devfiles__[] = { /* must map with onlp_thermal_id */
     NULL,
     NULL,                  /* CPU_CORE files */
-    "/sys/bus/i2c/devices/%d-0049*temp1_input",
-    "/sys/bus/i2c/devices/%d-004a*temp1_input",
-    "/sys/bus/i2c/devices/%d-004c*temp1_input",
-    "/sys/bus/i2c/devices/%d-004d*temp1_input",
-    "/sys/bus/i2c/devices/%d-004c*temp1_input",
-    "/sys/bus/i2c/devices/%d-004c*temp2_input",
-    "/sys/bus/i2c/devices/%d-005a*psu_temp2_input",
-    "/sys/bus/i2c/devices/%d-005a*psu_temp3_input",
-    "/sys/bus/i2c/devices/%d-0058*psu_temp2_input",
-    "/sys/bus/i2c/devices/%d-0058*psu_temp3_input"
+    "/sys/bus/i2c/devices/14-0049*temp1_input",
+    "/sys/bus/i2c/devices/14-004a*temp1_input",
+    "/sys/bus/i2c/devices/14-004c*temp1_input",
+    "/sys/bus/i2c/devices/14-004d*temp1_input",
+    "/sys/bus/i2c/devices/2-004c*temp1_input",
+    "/sys/bus/i2c/devices/2-004c*temp2_input",
+    "/sys/bus/i2c/devices/7-005a*psu_temp2_input",
+    "/sys/bus/i2c/devices/7-005a*psu_temp3_input",
+    "/sys/bus/i2c/devices/8-0058*psu_temp2_input",
+    "/sys/bus/i2c/devices/8-0058*psu_temp3_input"
 };
 
 #define CPU_CORETEMP_DIR_PATH "/sys/devices/platform/coretemp.0/hwmon"
@@ -229,8 +229,6 @@ int
 onlp_thermali_info_get(onlp_oid_t id, onlp_thermal_info_t* info)
 {
     int coretemp_max = 0, coretemp_temp = 0;
-    int bus_addr[] = {0, 0, 13, 13, 13, 13, 1, 1, 6, 6, 7, 7};
-    int bus_offset = 0;
     int tid;
     int psu_id, psu_tid_start = 0;
     int val = 0;
@@ -254,9 +252,6 @@ onlp_thermali_info_get(onlp_oid_t id, onlp_thermal_info_t* info)
         return ONLP_STATUS_OK;
     }
 
-    if (get_i2c_bus_offset(&bus_offset) != ONLP_STATUS_OK)
-        return ONLP_STATUS_E_INTERNAL;
-
     psu_tid_start = CHASSIS_THERMAL_COUNT + 1;
 
     if (tid >= psu_tid_start) {
@@ -275,5 +270,5 @@ onlp_thermali_info_get(onlp_oid_t id, onlp_thermal_info_t* info)
         }
     }
 
-    return onlp_file_read_int(&info->mcelsius, devfiles__[tid], bus_addr[tid]+bus_offset);
+    return onlp_file_read_int(&info->mcelsius, devfiles__[tid]);
 }

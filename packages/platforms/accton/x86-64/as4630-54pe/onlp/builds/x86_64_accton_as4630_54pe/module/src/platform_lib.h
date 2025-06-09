@@ -62,6 +62,7 @@
 #define FAN_NODE(node)	CPLD_NODE_PATH#node
 
 #define IDPROM_PATH "/sys/bus/i2c/devices/%d-0057/eeprom"
+#define BIOS_VER_PATH "/sys/devices/virtual/dmi/id/bios_version"
 
 int onlp_file_write_integer(char *filename, int value);
 int onlp_file_read_binary(char *filename, char *buffer, int buf_size, int data_len);

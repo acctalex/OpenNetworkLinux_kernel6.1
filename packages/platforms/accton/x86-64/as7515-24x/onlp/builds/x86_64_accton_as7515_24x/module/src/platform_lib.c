@@ -70,13 +70,9 @@ int onlp_get_fan_hwmon_idx(void)
     char* file = NULL;
     char path[64];
     int ret, hwmon_idx, max_hwmon_idx = 20;
-    int bus_offset = 0;
-
-    if (get_i2c_bus_offset(&bus_offset) != ONLP_STATUS_OK)
-        return ONLP_STATUS_E_INTERNAL;
 
     for (hwmon_idx = 0; hwmon_idx <= max_hwmon_idx; hwmon_idx++) {
-        snprintf(path, sizeof(path), FAN_SYSFS_FORMAT_2, 8+bus_offset, hwmon_idx);
+        snprintf(path, sizeof(path), "/sys/bus/i2c/devices/9-0066/hwmon/hwmon%d/", hwmon_idx);
 
         ret = onlp_file_find(path, "name", &file);
         AIM_FREE_IF_PTR(file);
@@ -90,41 +86,25 @@ int onlp_get_fan_hwmon_idx(void)
 
 int psu_cpld_status_get(int pid, char *node, int *value)
 {
-    char *pre_path;
-    char path[64] = {0};
+    char *path;
     *value = 0;
-    int bus_addr[] = {6, 7};
-    int bus_offset = 0;
 
-    pre_path = psu_get_eeprom_dir(pid);
-    if (pre_path == NULL)
+    path = psu_get_eeprom_dir(pid);
+    if (path == NULL)
         return ONLP_STATUS_E_INTERNAL;
-
-    if (get_i2c_bus_offset(&bus_offset) != ONLP_STATUS_OK)
-        return ONLP_STATUS_E_INTERNAL;
-
-    snprintf(path, sizeof(path), pre_path, bus_addr[pid-1]+bus_offset);
 
     return onlp_file_read_int(value, "%s*%s", path, node);
 }
 
 int psu_eeprom_str_get(int pid, char *data_buf, int data_len, char *data_name)
 {
-    char *pre_path;
-    char path[64] = {0};
+    char *path;
     int   len    = 0;
     char *str = NULL;
-    int bus_addr[] = {6, 7};
-    int bus_offset = 0;
 
-    pre_path = psu_get_eeprom_dir(pid);
-    if (pre_path == NULL)
+    path = psu_get_eeprom_dir(pid);
+    if (path == NULL)
         return ONLP_STATUS_E_INTERNAL;
-
-    if (get_i2c_bus_offset(&bus_offset) != ONLP_STATUS_OK)
-        return ONLP_STATUS_E_INTERNAL;
-
-    snprintf(path, sizeof(path), pre_path, bus_addr[pid-1]+bus_offset);
 
     /* Read attribute */
     len = onlp_file_read_str(&str, "%s/%s", path, data_name);
@@ -145,20 +125,12 @@ int psu_eeprom_str_get(int pid, char *data_buf, int data_len, char *data_name)
 
 int psu_pmbus_info_get(int pid, char *node, int *value)
 {
-    char *pre_path;
-    char path[64] = {0};
+    char *path;
     *value = 0;
-    int bus_addr[] = {6, 7};
-    int bus_offset = 0;
 
-    pre_path = psu_get_pmbus_dir(pid);
-    if (pre_path == NULL)
+    path = psu_get_pmbus_dir(pid);
+    if (path == NULL)
         return ONLP_STATUS_E_INTERNAL;
-
-    if (get_i2c_bus_offset(&bus_offset) != ONLP_STATUS_OK)
-        return ONLP_STATUS_E_INTERNAL;
-
-    snprintf(path, sizeof(path), pre_path, bus_addr[pid-1]+bus_offset);
 
     return onlp_file_read_int(value, "%s*%s", path, node);
 }
@@ -166,52 +138,19 @@ int psu_pmbus_info_get(int pid, char *node, int *value)
 int fan_info_get(int fid, char *node, int *value)
 {
     *value = 0;
-    int bus_offset = 0;
-
-    if (get_i2c_bus_offset(&bus_offset) != ONLP_STATUS_OK)
-        return ONLP_STATUS_E_INTERNAL;
-
-    return onlp_file_read_int(value, FAN_SYSFS_FORMAT, 8+bus_offset, fid, node);
-}
-
-int get_i2c_bus_offset(int *bus_offset)
-{
-    int len = 0;
-    char *i2c_bus_0_name = NULL;
-
-    len = onlp_file_read_str(&i2c_bus_0_name, "/sys/bus/i2c/devices/i2c-0/name");
-
-    if(i2c_bus_0_name == NULL || len <= 0){
-        AIM_LOG_ERROR("Unable to read the name sysfs of i2c-0\r\n");
-        AIM_FREE_IF_PTR(i2c_bus_0_name);
-        return ONLP_STATUS_E_INTERNAL;
-    }
-
-    *bus_offset = 0;
-    if(!strncmp(i2c_bus_0_name, "SMBus iSMT", strlen("SMBus iSMT"))){
-        *bus_offset = 1;
-    }
-
-    AIM_FREE_IF_PTR(i2c_bus_0_name);
-    return ONLP_STATUS_OK;
+    return onlp_file_read_int(value, FAN_SYSFS_FORMAT, fid, node);
 }
 
 psu_type_t get_psu_type(int id, char* modelname, int modelname_len)
 {
     int   len = 0;
-    int   bus_offset = 0, bus_addr[] = {6, 7};
-    char  path[64] = {0};
+    char  *path;
     char  *str = NULL;
-    char  *pre_path;
 
-    pre_path = psu_get_pmbus_dir(id);
-    if (pre_path == NULL)
+    path = psu_get_pmbus_dir(id);
+    if (path == NULL)
         return ONLP_STATUS_E_INTERNAL;
 
-    if (get_i2c_bus_offset(&bus_offset) != ONLP_STATUS_OK)
-        return ONLP_STATUS_E_INTERNAL;
-
-    snprintf(path, sizeof(path), pre_path, bus_addr[id-1]+bus_offset);
     len = onlp_file_read_str(&str, "%s/%s", path, "psu_mfr_model");
 
     if (!str || len <= 0) {
@@ -227,10 +166,10 @@ psu_type_t get_psu_type(int id, char* modelname, int modelname_len)
         return PSU_TYPE_SPAACTN_03;
     }
 
-    if (!strncmp(str, "CRXT_T0T12", strlen("CRXT_T0T12")))
+    if (!strncmp(str, "CRXT-T0T12", strlen("CRXT-T0T12")))
     {
         if (modelname)
-            aim_strlcpy(modelname, str, strlen("CRXT_T0T12")<(modelname_len-1)?(strlen("CRXT_T0T12")+1):(modelname_len-1));
+            aim_strlcpy(modelname, str, strlen("CRXT-T0T12")<(modelname_len-1)?(strlen("CRXT-T0T12")+1):(modelname_len-1));
             AIM_FREE_IF_PTR(str);
         return PSU_TYPE_CRXT_T0T12;
     }

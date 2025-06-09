@@ -167,7 +167,6 @@ int
 onlp_fani_percentage_set(onlp_oid_t id, int p)
 {
     int  fid;
-    int bus_offset = 0;
 
     VALIDATE(id);
 
@@ -177,10 +176,7 @@ onlp_fani_percentage_set(onlp_oid_t id, int p)
         return ONLP_STATUS_E_UNSUPPORTED;
     }
 
-    if(get_i2c_bus_offset(&bus_offset) != ONLP_STATUS_OK)
-        return ONLP_STATUS_E_INTERNAL;
-
-    if (onlp_file_write_int(p, FAN_SYSFS_FORMAT, 8+bus_offset, fid, "pwm") != 0) {
+    if (onlp_file_write_int(p, FAN_SYSFS_FORMAT, fid, "pwm") != 0) {
         AIM_LOG_ERROR("Unable to change duty cycle of fan (%d)\r\n", fid);
         return ONLP_STATUS_E_INTERNAL;
     }
