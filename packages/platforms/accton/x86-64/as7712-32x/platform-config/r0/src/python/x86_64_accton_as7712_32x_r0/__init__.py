@@ -37,6 +37,8 @@ class OnlPlatform_x86_64_accton_as7712_32x_r0(OnlPlatformAccton,
             ('lm75', 0x4b, 3),
 
             ('as7712_32x_cpld1', 0x60, 4),
+            ('as7712_32x_cpld2', 0x62, 5),
+            ('as7712_32x_cpld3', 0x64, 6),
             ])
 
         ########### initialize I2C bus 1 ###########
