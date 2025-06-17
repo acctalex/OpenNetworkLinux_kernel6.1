@@ -152,7 +152,8 @@ onlp_sysi_platform_info_get(onlp_platform_info_t* pi)
                                     v[0], v[2], v[3], v[4], v[5]);
 
     pi->other_versions = aim_fstrdup("\r\n\t   FPGA(0x60): %02X"
-                                     "\r\n\t   BIOS: %s\r\n\t   ONIE: %s"
+                                     "\r\n\t   BIOS: %s"
+                                     "\r\n\t   ONIE: %s"
                                      "\r\n\t   BMC: %s",
                                      v[1], bios_ver, onie.onie_version, bmc_ver);
 
