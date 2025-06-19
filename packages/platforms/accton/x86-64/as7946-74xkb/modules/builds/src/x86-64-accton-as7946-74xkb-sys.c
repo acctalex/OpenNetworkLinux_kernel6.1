@@ -50,7 +50,9 @@ static void ipmi_msg_handler(struct ipmi_recv_msg *msg, void *user_msg_data);
 static int as7946_74xkb_sys_probe(struct platform_device *pdev);
 static int as7946_74xkb_sys_remove(struct platform_device *pdev);
 static ssize_t show_cpld_version(struct device *dev, 
-	struct device_attribute *da, char *buf);
+			struct device_attribute *da, char *buf);
+static ssize_t show_bios_flash_id(struct device *dev, 
+			struct device_attribute *da, char *buf);
 
 struct ipmi_data {
 	struct completion   read_complete;
@@ -96,6 +98,7 @@ enum as7946_74xkb_sys_sysfs_attrs {
 	CPU_CPLD_VER, /* CPU board CPLD version */
 	SYSTEM_CPLD1_VER, /* System cpld1 version */
 	FAN_CPLD_VER, /* FAN CPLD version */
+	BIOS_FLASH_ID
 };
 
 static SENSOR_DEVICE_ATTR(cpu_cpld_ver, S_IRUGO, show_cpld_version, 
@@ -104,11 +107,14 @@ static SENSOR_DEVICE_ATTR(system_cpld1_ver, S_IRUGO, show_cpld_version,
 			  NULL, SYSTEM_CPLD1_VER);
 static SENSOR_DEVICE_ATTR(fan_cpld_ver, S_IRUGO, show_cpld_version, 
 			  NULL, FAN_CPLD_VER);
+static SENSOR_DEVICE_ATTR(bios_flash_id, S_IRUGO, \
+			  show_bios_flash_id, NULL, BIOS_FLASH_ID);
 
 static struct attribute *as7946_74xkb_sys_attributes[] = {
 	&sensor_dev_attr_cpu_cpld_ver.dev_attr.attr,
 	&sensor_dev_attr_system_cpld1_ver.dev_attr.attr,
 	&sensor_dev_attr_fan_cpld_ver.dev_attr.attr,
+	&sensor_dev_attr_bios_flash_id.dev_attr.attr,
 	NULL
 };
 
@@ -339,6 +345,34 @@ exit:
 	return data;
 }
 
+static struct as7946_74xkb_sys_data *as7946_74xkb_sys_update_reg(
+			unsigned char addr, unsigned char reg)
+{
+	int status = 0;
+
+	data->valid = 0;
+
+	data->ipmi_tx_data[0] = addr;
+	data->ipmi_tx_data[1] = reg;
+	status = ipmi_send_message(&data->ipmi, IPMI_GET_CPLD_CMD,
+					data->ipmi_tx_data, 2,
+					data->ipmi_resp_cpld,
+					sizeof(data->ipmi_resp_cpld));
+	if (unlikely(status != 0))
+		goto exit;
+
+	if (unlikely(data->ipmi.rx_result != 0)) {
+		status = -EIO;
+		goto exit;
+	}
+
+	data->last_updated = jiffies;
+	data->valid = 1;
+
+exit:
+	return data;
+}
+
 static ssize_t show_cpld_version(struct device *dev, 
 				 struct device_attribute *da, char *buf)
 {
@@ -387,6 +421,34 @@ static ssize_t show_cpld_version(struct device *dev,
 exit:
 	mutex_unlock(&data->update_lock);
 	return error;    
+}
+
+static ssize_t show_bios_flash_id(struct device *dev, struct device_attribute *da,
+					char *buf)
+{
+	unsigned char addr = 0x65;
+	unsigned char reg = 0x3;
+	unsigned char bit_offset = 0x2;
+	unsigned char value = 0;
+	int error = 0;
+
+	mutex_lock(&data->update_lock);
+
+	data = as7946_74xkb_sys_update_reg(addr, reg);
+
+	if (!data->valid) {
+		error = -EIO;
+		goto exit;
+	}
+
+	value = ((data->ipmi_resp_cpld[0] >> bit_offset) == 1) ? 1 : 2; /*1: master, 2: slave*/
+
+	mutex_unlock(&data->update_lock);
+	return sprintf(buf, "%d\n", value);
+
+exit:
+	mutex_unlock(&data->update_lock);
+	return error;
 }
 
 static int as7946_74xkb_sys_probe(struct platform_device *pdev)
