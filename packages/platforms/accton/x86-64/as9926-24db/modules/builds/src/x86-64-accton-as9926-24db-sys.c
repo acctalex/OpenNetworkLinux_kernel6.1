@@ -35,6 +35,8 @@
 
 #define IPMI_SYSEEPROM_READ_CMD 0x18
 #define IPMI_READ_MAX_LEN       128
+#define IPMI_RESET_CMD 0x65
+#define IPMI_RESET_CMD_LENGTH 6
 
 #define EEPROM_NAME		"eeprom"
 #define EEPROM_SIZE		512	/*512 byte eeprom */
@@ -52,6 +54,10 @@ static int as9926_24db_sys_remove(struct platform_device *pdev);
 static ssize_t show_cpld_version(struct device *dev, 
 	struct device_attribute *da, char *buf);
 static ssize_t show_cpld_value(struct device *dev, struct device_attribute *da, char *buf);
+static ssize_t get_reset(struct device *dev, struct device_attribute *da,
+			char *buf);
+static ssize_t set_reset(struct device *dev, struct device_attribute *da,
+			const char *buf, size_t count);
 
 struct as9926_24db_sys_data {
 	struct platform_device *pdev;
@@ -62,6 +68,8 @@ struct as9926_24db_sys_data {
 	unsigned char    ipmi_resp_eeprom[EEPROM_SIZE];
 	unsigned char    ipmi_resp_cpld;
 	unsigned char    ipmi_tx_data[3];
+	unsigned char    ipmi_resp_rst[2];
+	unsigned char    ipmi_tx_data_rst[IPMI_RESET_CMD_LENGTH];
 	struct bin_attribute eeprom;      /* eeprom data */
 };
 
@@ -82,7 +90,8 @@ enum as9926_24db_sys_sysfs_attrs {
 	CPU_CPLD_VER, /* CPU board CPLD version */
 	FAN_CPLD_VER, /* FAN CPLD version */
 	FPGA_CPLD_VER, /* FPGA CPLD version */
-    BIOS_FLASH_ID,
+	BIOS_FLASH_ID,
+	RESET_MAC,
 };
 
 static SENSOR_DEVICE_ATTR(mb_cpld2_ver, S_IRUGO, show_cpld_version, 
@@ -96,6 +105,8 @@ static SENSOR_DEVICE_ATTR(fan_cpld_ver, S_IRUGO, show_cpld_version,
 static SENSOR_DEVICE_ATTR(fpga_cpld_ver, S_IRUGO, show_cpld_version, 
 			  NULL, FPGA_CPLD_VER);
 static SENSOR_DEVICE_ATTR(bios_flash_id, S_IRUGO, show_cpld_value, NULL, BIOS_FLASH_ID);
+static SENSOR_DEVICE_ATTR(reset_mac, S_IWUSR | S_IRUGO, \
+			  get_reset, set_reset, RESET_MAC);
 
 static struct attribute *as9926_24db_sys_attributes[] = {
 	&sensor_dev_attr_mb_cpld2_ver.dev_attr.attr,
@@ -104,12 +115,77 @@ static struct attribute *as9926_24db_sys_attributes[] = {
 	&sensor_dev_attr_fan_cpld_ver.dev_attr.attr,
 	&sensor_dev_attr_fpga_cpld_ver.dev_attr.attr,
 	&sensor_dev_attr_bios_flash_id.dev_attr.attr,
+	&sensor_dev_attr_reset_mac.dev_attr.attr,
 	NULL
 };
 
 static const struct attribute_group as9926_24db_sys_group = {
 	.attrs = as9926_24db_sys_attributes,
 };
+
+static ssize_t get_reset(struct device *dev, struct device_attribute *da,
+			char *buf)
+{
+	int status = 0;
+
+	mutex_lock(&data->update_lock);
+	status = ipmi_send_message(&data->ipmi, IPMI_RESET_CMD, NULL, 0,
+				   data->ipmi_resp_rst, sizeof(data->ipmi_resp_rst));
+	if (unlikely(status != 0))
+		goto exit;
+
+	if (unlikely(data->ipmi.rx_result != 0)) {
+		status = -EIO;
+		goto exit;
+	}
+
+	mutex_unlock(&data->update_lock);
+	return sprintf(buf, "0x%x 0x%x", data->ipmi_resp_rst[0], data->ipmi_resp_rst[1]);
+
+ exit:
+	mutex_unlock(&data->update_lock);
+	return status;
+}
+
+static ssize_t set_reset(struct device *dev, struct device_attribute *da,
+		       const char *buf, size_t count)
+{
+	u32 magic[2];
+	int status;
+
+	if (sscanf(buf, "0x%x 0x%x", &magic[0], &magic[1]) != 2)
+		return -EINVAL;
+
+	if (magic[0] > 0xFF || magic[1] > 0xFF)
+		return -EINVAL;
+
+	mutex_lock(&data->update_lock);
+
+	/* Send IPMI write command */
+	data->ipmi_tx_data_rst[0] = 0;
+	data->ipmi_tx_data_rst[1] = 0;
+	data->ipmi_tx_data_rst[2] = 1;
+	data->ipmi_tx_data_rst[3] = 1;
+	data->ipmi_tx_data_rst[4] = magic[0];
+	data->ipmi_tx_data_rst[5] = magic[1];
+
+	status = ipmi_send_message(&data->ipmi, IPMI_RESET_CMD,
+				   data->ipmi_tx_data_rst,
+				   sizeof(data->ipmi_tx_data_rst), NULL, 0);
+	if (unlikely(status != 0))
+		goto exit;
+
+	if (unlikely(data->ipmi.rx_result != 0)) {
+		status = -EIO;
+		goto exit;
+	}
+
+	status = count;
+
+exit:
+	mutex_unlock(&data->update_lock);
+	return status;
+}
 
 static ssize_t sys_eeprom_read(loff_t off, char *buf, size_t count)
 {
