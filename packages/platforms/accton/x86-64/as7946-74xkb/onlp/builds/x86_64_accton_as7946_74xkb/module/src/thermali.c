@@ -26,6 +26,12 @@
 #include <onlplib/file.h>
 #include <onlp/platformi/thermali.h>
 #include "platform_lib.h"
+#include <dirent.h>
+#include <regex.h>
+
+#define CPU_CORETEMP_DIR_PATH "/sys/devices/platform/coretemp.0/hwmon"
+#define MAX_ENTRIES 128  /* Maximum number of temp*_input files */
+#define MAX_NAME_LEN 256 /* Maximum file name length */
 
 #define VALIDATE(_id)                           \
     do {                                        \
@@ -47,24 +53,29 @@ static char* ipmi_devfiles__[] = { /* must map with onlp_thermal_id */
     "/sys/devices/platform/as7946_74xkb_thermal/temp8_input",
     "/sys/devices/platform/as7946_74xkb_thermal/temp9_input",
     "/sys/devices/platform/as7946_74xkb_psu/psu1_temp1_input",
-    "/sys/devices/platform/as7946_74xkb_psu/psu1_temp2_input",
-    "/sys/devices/platform/as7946_74xkb_psu/psu1_temp3_input",
     "/sys/devices/platform/as7946_74xkb_psu/psu2_temp1_input",
-    "/sys/devices/platform/as7946_74xkb_psu/psu2_temp2_input",
-    "/sys/devices/platform/as7946_74xkb_psu/psu2_temp3_input",
 };
 
-static char* cpu_coretemp_files[] = {
-    "/sys/devices/platform/coretemp.0*temp2_input",
-    "/sys/devices/platform/coretemp.0*temp3_input",
-    "/sys/devices/platform/coretemp.0*temp4_input",
-    "/sys/devices/platform/coretemp.0*temp5_input",
-    "/sys/devices/platform/coretemp.0*temp6_input",
-    "/sys/devices/platform/coretemp.0*temp7_input",
-    "/sys/devices/platform/coretemp.0*temp8_input",
-    "/sys/devices/platform/coretemp.0*temp9_input",
-    NULL,
-};
+typedef struct {
+    char name[MAX_NAME_LEN];
+    int index;
+} TempEntry;
+
+
+TempEntry temp_entries[MAX_ENTRIES];
+/* Global regex variables */
+regex_t dir_regex, file_regex;
+int sysfs_count = 0;
+/* Function to safely concatenate paths and handle overflow */
+int safe_snprintf(char *buffer, size_t buffer_size, const char *path1, const char *path2) {
+    size_t needed_size = strlen(path1) + strlen(path2) + 2; /* 1 for '/', 1 for '\0' */
+    if (needed_size > buffer_size) {
+        AIM_LOG_ERROR("Path too long: %s/%s\n", path1, path2);
+        return -1;
+    }
+    snprintf(buffer, buffer_size, "%s/%s", path1, path2);
+    return 0;
+}
 
 #define AS7946_74XKB_THERMAL_CAPS (ONLP_THERMAL_CAPS_GET_TEMPERATURE | \
 			     ONLP_THERMAL_CAPS_GET_WARNING_THRESHOLD | \
@@ -121,27 +132,85 @@ static onlp_thermal_info_t linfo[] = {
             ONLP_THERMAL_STATUS_PRESENT,
             AS7946_74XKB_PSU_CAPS, 0, ONLP_THERMAL_THRESHOLD_INIT_DEFAULTS
         },
-    { { ONLP_THERMAL_ID_CREATE(THERMAL_2_ON_PSU1), "PSU-1 Thermal Sensor 2", ONLP_PSU_ID_CREATE(PSU1_ID), {0} },
-            ONLP_THERMAL_STATUS_PRESENT,
-            AS7946_74XKB_PSU_CAPS, 0, ONLP_THERMAL_THRESHOLD_INIT_DEFAULTS
-        },
-    { { ONLP_THERMAL_ID_CREATE(THERMAL_3_ON_PSU1), "PSU-1 Thermal Sensor 3", ONLP_PSU_ID_CREATE(PSU1_ID), {0} },
-            ONLP_THERMAL_STATUS_PRESENT,
-            AS7946_74XKB_PSU_CAPS, 0, ONLP_THERMAL_THRESHOLD_INIT_DEFAULTS
-        },
     { { ONLP_THERMAL_ID_CREATE(THERMAL_1_ON_PSU2), "PSU-2 Thermal Sensor 1", ONLP_PSU_ID_CREATE(PSU2_ID), {0} },
             ONLP_THERMAL_STATUS_PRESENT,
             AS7946_74XKB_PSU_CAPS, 0, ONLP_THERMAL_THRESHOLD_INIT_DEFAULTS
         },
-    { { ONLP_THERMAL_ID_CREATE(THERMAL_2_ON_PSU2), "PSU-2 Thermal Sensor 2", ONLP_PSU_ID_CREATE(PSU2_ID), {0} },
-            ONLP_THERMAL_STATUS_PRESENT,
-            AS7946_74XKB_PSU_CAPS, 0, ONLP_THERMAL_THRESHOLD_INIT_DEFAULTS
-        },
-    { { ONLP_THERMAL_ID_CREATE(THERMAL_3_ON_PSU2), "PSU-2 Thermal Sensor 3", ONLP_PSU_ID_CREATE(PSU2_ID), {0} },
-            ONLP_THERMAL_STATUS_PRESENT,
-            AS7946_74XKB_PSU_CAPS, 0, ONLP_THERMAL_THRESHOLD_INIT_DEFAULTS
-        },
 };
+
+int initialize_regex() {
+    if (regcomp(&dir_regex, "^hwmon[0-9]+$", REG_EXTENDED) != 0) {
+        AIM_LOG_ERROR("Failed to compile directory regex\n");
+        return -1;
+    }
+    if (regcomp(&file_regex, "^temp([0-9]+)_input$", REG_EXTENDED) != 0) {
+        AIM_LOG_ERROR("Failed to compile file regex\n");
+        regfree(&dir_regex);
+        return -1;
+    }
+    return 0;
+}
+
+void cleanup_regex() {
+    regfree(&dir_regex);
+    regfree(&file_regex);
+}
+
+/* Function to scan hwmon directories for temp*_input files */
+void scan_hwmon_files(const char *parent_path) {
+    DIR *parent_dir = opendir(parent_path);
+    if (!parent_dir) {
+        AIM_LOG_ERROR("Failed to open parent directory");
+        return;
+    }
+
+    size_t count = 0;
+
+    struct dirent *entry;
+    while ((entry = readdir(parent_dir)) != NULL) {
+        if (regexec(&dir_regex, entry->d_name, 0, NULL, 0) != 0) {
+            continue;
+        }
+
+        char subdir_path[MAX_NAME_LEN];
+        if (safe_snprintf(subdir_path, sizeof(subdir_path), parent_path, entry->d_name) < 0) {
+            continue;
+        }
+
+        DIR *subdir = opendir(subdir_path);
+        if (!subdir) {
+            AIM_LOG_ERROR("Failed to open subdirectory");
+            continue;
+        }
+
+        struct dirent *sub_entry;
+        while ((sub_entry = readdir(subdir)) != NULL) {
+            regmatch_t pmatch[2];
+            if (regexec(&file_regex, sub_entry->d_name, 2, pmatch, 0) == 0) {
+                if (count >= MAX_ENTRIES) {
+                    AIM_LOG_ERROR("Maximum entries reached. Ignoring additional files.\n");
+                    break;
+                }
+
+                char full_path[MAX_NAME_LEN];
+                if (safe_snprintf(full_path, sizeof(full_path), subdir_path, sub_entry->d_name) < 0) {
+                    continue;
+                }
+
+                int index = atoi(&sub_entry->d_name[pmatch[1].rm_so]);
+                strncpy(temp_entries[count].name, full_path, MAX_NAME_LEN - 1);
+                temp_entries[count].name[MAX_NAME_LEN - 1] = '\0';
+                temp_entries[count].index = index;
+                count++;
+            }
+        }
+        closedir(subdir);
+    }
+
+    closedir(parent_dir);
+
+    sysfs_count = count;
+}
 
 /*
  * This will be called to intiialize the thermali subsystem.
@@ -149,6 +218,14 @@ static onlp_thermal_info_t linfo[] = {
 int
 onlp_thermali_init(void)
 {
+    /* Initialize regex patterns */
+    if (initialize_regex() != 0) {
+        return ONLP_STATUS_E_INTERNAL;
+    }
+    scan_hwmon_files(CPU_CORETEMP_DIR_PATH);
+    /* Clean up regex patterns */
+    cleanup_regex();
+
     return ONLP_STATUS_OK;
 }
 
@@ -166,16 +243,48 @@ int
 onlp_thermali_info_get(onlp_oid_t id, onlp_thermal_info_t* info)
 {
     int tid;
+    int psu_id, psu_tid_start = 0;
+    int val = 0;
+    int ret = 0;
     VALIDATE(id);
 
     tid = ONLP_OID_ID_GET(id);
+    int coretemp_max = 0, coretemp_temp = 0;
 
     /* Set the onlp_oid_hdr_t and capabilities */
     *info = linfo[tid];
 
     if(tid == THERMAL_CPU_CORE) {
-        int rv = onlp_file_read_int_max(&info->mcelsius, cpu_coretemp_files);
-        return rv;
+        for (size_t i = 0; i < sysfs_count; i++) {
+            if (onlp_file_read_int(&coretemp_temp, temp_entries[i].name) < 0) {
+                AIM_LOG_ERROR("Unable to read status from file (%s)\r\n", temp_entries[i].name);
+
+                return ONLP_STATUS_E_INTERNAL;
+            }
+
+            if (coretemp_temp > coretemp_max)
+                coretemp_max = coretemp_temp;
+        }
+
+        info->mcelsius = coretemp_max;
+
+        return ONLP_STATUS_OK;
+    }
+
+    psu_tid_start = CHASSIS_THERMAL_COUNT + 1;
+
+    if (tid >= psu_tid_start) {
+        psu_id = ( tid <= THERMAL_1_ON_PSU1 ) ? PSU1_ID : PSU2_ID;
+        /* Get power good status */
+        ret = onlp_file_read_int(&val, "%s""psu%d_power_good", PSU_SYSFS_PATH, psu_id);
+        if (ret < 0) {
+            AIM_LOG_ERROR("Unable to read status from (%s""psu%d_power_good)\r\n", PSU_SYSFS_PATH, psu_id);
+            return ONLP_STATUS_E_INTERNAL;
+        }
+
+        if(val != PSU_STATUS_POWER_GOOD) {
+            info->status |= ONLP_THERMAL_STATUS_FAILED;
+        }
     }
 
     return onlp_file_read_int(&info->mcelsius, ipmi_devfiles__[tid]);

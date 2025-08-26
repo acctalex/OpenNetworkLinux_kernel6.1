@@ -259,7 +259,7 @@ onlp_psui_info_get(onlp_oid_t id, onlp_psu_info_t* info)
     }
 
     if (val != PSU_STATUS_POWER_GOOD) {
-        info->status |=  ONLP_PSU_STATUS_FAILED;
+        info->status |= ONLP_PSU_STATUS_UNPLUGGED;
     }
 
 
@@ -289,6 +289,12 @@ onlp_psui_info_get(onlp_oid_t id, onlp_psu_info_t* info)
             ret = psu_dc12v_750_info_get(info);
             break;
         case PSU_TYPE_UNKNOWN:  /* User insert a unknown PSU or unplugged.*/
+            /* Set the associated oid_table */
+            info->hdr.coids[0] = ONLP_FAN_ID_CREATE(index + CHASSIS_FAN_COUNT);
+            info->hdr.coids[1] = ONLP_THERMAL_ID_CREATE(CHASSIS_THERMAL_COUNT + (index-1)*NUM_OF_THERMAL_PER_PSU + 1);
+            info->hdr.coids[2] = ONLP_THERMAL_ID_CREATE(CHASSIS_THERMAL_COUNT + (index-1)*NUM_OF_THERMAL_PER_PSU + 2);
+            info->hdr.coids[3] = ONLP_THERMAL_ID_CREATE(CHASSIS_THERMAL_COUNT + (index-1)*NUM_OF_THERMAL_PER_PSU + 3);
+
             info->status |= ONLP_PSU_STATUS_UNPLUGGED;
             info->status &= ~ONLP_PSU_STATUS_FAILED;
             ret = ONLP_STATUS_OK;

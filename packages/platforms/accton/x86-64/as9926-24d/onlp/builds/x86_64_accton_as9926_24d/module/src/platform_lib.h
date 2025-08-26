@@ -32,9 +32,13 @@
 #define CHASSIS_THERMAL_COUNT	10
 #define CHASSIS_PSU_COUNT		2
 #define CHASSIS_LED_COUNT		5
+#define NUM_OF_SENSOR_PER_PSU   3
 
 #define PSU1_ID 1
 #define PSU2_ID 2
+
+#define PSU_STATUS_PRESENT    1
+#define PSU_STATUS_POWER_GOOD 1
 
 #define PSU1_AC_PMBUS_PREFIX "/sys/bus/i2c/devices/10-0059/"
 #define PSU2_AC_PMBUS_PREFIX "/sys/bus/i2c/devices/9-0058/"
@@ -84,6 +88,7 @@ typedef enum psu_type {
 
 psu_type_t get_psu_type(int id, char* modelname, int modelname_len);
 int get_psu_serial_number(int id, char *serial, int serial_len);
+int psu_status_info_get(int id, char *node, int *value);
 
 #define DEBUG_MODE 0
 

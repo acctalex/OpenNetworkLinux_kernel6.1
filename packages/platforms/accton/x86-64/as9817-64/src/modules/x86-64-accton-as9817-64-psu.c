@@ -807,6 +807,28 @@ exit:
     return error;
 }
 
+static umode_t as9817_64_psu_is_visible(const void *drvdata,
+                  enum hwmon_sensor_types type,
+                  u32 attr, int channel)
+{
+	return 0;
+}
+
+static const struct hwmon_channel_info *as9817_64_psu_info[] = {
+	HWMON_CHANNEL_INFO(power,
+               		HWMON_P_ENABLE),
+	NULL,
+};
+
+static const struct hwmon_ops as9817_64_psu_hwmon_ops = {
+	.is_visible = as9817_64_psu_is_visible,
+};
+
+static const struct hwmon_chip_info as9817_64_psu_chip_info = {
+	.ops = &as9817_64_psu_hwmon_ops,
+	.info = as9817_64_psu_info,
+};
+
 static int as9817_64_psu_probe(struct platform_device *pdev)
 {
     int status = 0;
@@ -820,7 +842,6 @@ static int as9817_64_psu_probe(struct platform_device *pdev)
             status = PTR_ERR(hwmon_dev);
             return status;
         }
-
         mutex_lock(&data->update_lock);
         data->hwmon_dev[i] = hwmon_dev;
         mutex_unlock(&data->update_lock);

@@ -27,6 +27,10 @@
 #include <onlplib/file.h>
 #include "platform_lib.h"
 
+#define WARM_RESET_FORMAT "/sys/devices/platform/as7535_28xb_sys/reset_%s"
+
+#define PSU_MODEL_NAME_LEN 10
+
 enum onlp_fan_dir onlp_get_fan_dir(int fid)
 {
     int len = 0;
@@ -79,4 +83,81 @@ int get_pcb_id()
     pcb_id = (atoi(data) >> 2) & 0xff;
 
     return pcb_id;
+}
+
+/**
+ * @brief warm reset for mac, mux
+ * @param unit_id The warm reset device unit id, should be 0
+ * @param reset_dev The warm reset device id, should be 1 ~ (WARM_RESET_MAX-1)
+ * @param ret return value.
+ */
+int onlp_data_path_reset(uint8_t unit_id, uint8_t reset_dev)
+{
+    int len = 0;
+    int ret = ONLP_STATUS_OK;
+    char *magic_num = NULL;
+    char *device_id[] = { NULL, "mac", NULL, "mux" };
+
+    if (unit_id != 0 || reset_dev >= WARM_RESET_MAX)
+        return ONLP_STATUS_E_PARAM;
+
+    if (reset_dev == 0 || reset_dev == WARM_RESET_PHY)
+        return ONLP_STATUS_E_UNSUPPORTED;
+
+    /* Reset device */
+    len = onlp_file_read_str(&magic_num, WARM_RESET_FORMAT, device_id[reset_dev]);
+    if (magic_num && len) {
+        ret = onlp_file_write_str(magic_num, WARM_RESET_FORMAT, device_id[reset_dev]);
+        if (ret < 0) {
+            AIM_LOG_ERROR("Reset device-%d:(%s) failed.", reset_dev, device_id[reset_dev]);
+        }
+    }
+    else {
+        ret = ONLP_STATUS_E_INTERNAL;
+    }
+
+    AIM_FREE_IF_PTR(magic_num);
+    return ret;
+}
+
+psu_type_t get_psu_type(int tid, int psu_tid_start, char* modelname, int modelname_len)
+{
+    int ret = 0;
+    int pid = 0;
+    char *node = NULL;
+    char *mn   = NULL;
+
+    pid = (tid - psu_tid_start) < NUM_OF_THERMAL_PER_PSU ? PSU1_ID : PSU2_ID;
+
+    /* Check model name */
+    node = (pid == PSU1_ID) ? PSU_SYSFS_NODE(psu1_model) : PSU_SYSFS_NODE(psu2_model);
+
+    ret = onlp_file_read_str(&mn, node);
+
+    if (ret <= 0 || ret > PSU_MODEL_NAME_LEN || mn == NULL) {
+        AIM_FREE_IF_PTR(mn);
+        return PSU_TYPE_UNKNOWN;
+    }
+
+    if (!strncmp(mn, "PS-2601-6R", strlen("PS-2601-6R"))) {
+        if (modelname)
+            aim_strlcpy(modelname, mn, strlen(mn) <
+                (modelname_len-1) ? (strlen(mn)+1) :
+                (modelname_len-1));
+        AIM_FREE_IF_PTR(mn);
+
+        return PSU_TYPE_PS_2601_6R;
+    }
+
+    if (!strncmp(mn, "DD-2601-6R", strlen("DD-2601-6R"))) {
+        if (modelname)
+            aim_strlcpy(modelname, mn, strlen(mn) <
+                (modelname_len-1) ? (strlen(mn)+1) :
+                (modelname_len-1));
+        AIM_FREE_IF_PTR(mn);
+        return PSU_TYPE_DD_2601_6R;
+    }
+
+    AIM_FREE_IF_PTR(mn);
+    return PSU_TYPE_UNKNOWN;
 }

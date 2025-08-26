@@ -27,9 +27,6 @@
 #include <onlp/platformi/psui.h>
 #include "platform_lib.h"
 
-#define PSU_STATUS_PRESENT 1
-#define PSU_STATUS_POWER_GOOD 1
-
 #define VALIDATE(_id)                           \
     do {                                        \
         if(!ONLP_OID_IS_PSU(_id)) {             \
@@ -83,21 +80,6 @@ onlp_psui_info_get(onlp_oid_t id, onlp_psu_info_t* info)
         return ONLP_STATUS_OK;
     }
     info->status |= ONLP_PSU_STATUS_PRESENT;
-
-
-    /* Get power good status */
-    ret = onlp_file_read_int(&val, "%s""psu%d_power_good", PSU_SYSFS_PATH, pid);
-    if (ret < 0) {
-        AIM_LOG_ERROR("Unable to read status from (%s""psu%d_power_good)\r\n",
-                      PSU_SYSFS_PATH, pid);
-        info->status |=  ONLP_PSU_STATUS_FAILED;
-        return ONLP_STATUS_E_INTERNAL;
-    }
-
-    if (val != PSU_STATUS_POWER_GOOD) {
-        info->status |=  ONLP_PSU_STATUS_FAILED;
-        return ONLP_STATUS_OK;
-    }
 
     /* Set capability
      */
@@ -174,6 +156,18 @@ onlp_psui_info_get(onlp_oid_t id, onlp_psu_info_t* info)
         info->serial[len] = '\0';
     }
     AIM_FREE_IF_PTR(str);
+
+    /* Get power good status */
+    ret = onlp_file_read_int(&val, "%s""psu%d_power_good", PSU_SYSFS_PATH, pid);
+    if (ret < 0) {
+        AIM_LOG_ERROR("Unable to read status from (%s""psu%d_power_good)\r\n",
+                      PSU_SYSFS_PATH, pid);
+        return ONLP_STATUS_E_INTERNAL;
+    }
+    if (val != PSU_STATUS_POWER_GOOD) {
+        info->status |=  ONLP_PSU_STATUS_UNPLUGGED;
+        info->caps = 0;
+    }
 
     return ret;
 }

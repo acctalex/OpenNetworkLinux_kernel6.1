@@ -90,7 +90,7 @@ int onlp_file_read_string(char *filename, char *buffer, int buf_size, int data_l
     return ret;
 }
 
-#define I2C_PSU_MODEL_NAME_LEN 11
+#define I2C_PSU_MODEL_NAME_LEN 14
 #define I2C_PSU_FAN_DIR_LEN    3
 
 psu_type_t get_psu_type(int id, char* modelname, int modelname_len)
@@ -126,6 +126,13 @@ psu_type_t get_psu_type(int id, char* modelname, int modelname_len)
             aim_strlcpy(modelname, model_name, (modelname_len>strlen(model_name))?strlen(model_name):modelname_len-1);
         return PSU_TYPE_YPEB1200A;
     }
+
+    if (!strncmp(model_name, "UP1K21R-1085G", strlen("UP1K21R-1085G")))
+    {
+        if (modelname)
+            aim_strlcpy(modelname, model_name, (modelname_len>strlen(model_name))?strlen(model_name):modelname_len-1);
+        return PSU_TYPE_UP1K21R_1085G;
+    }
     return PSU_TYPE_UNKNOWN;
 }
 int 
@@ -151,6 +158,26 @@ psu_pmbus_info_get(int id, char *node, int *value)
     return ret;
 }
 
+int psu_status_info_get(int id, char *node, int *value)
+{
+    int ret = 0;
+    char path[PSU_NODE_MAX_PATH_LEN] = {0};
+
+    *value = 0;
+
+    if (PSU1_ID == id) {
+        sprintf(path, "%s%s", PSU1_AC_HWMON_PREFIX, node);
+    }
+    else if (PSU2_ID == id) {
+        sprintf(path, "%s%s", PSU2_AC_HWMON_PREFIX, node);
+    }
+    if (onlp_file_read_int(value, path) < 0) {
+        AIM_LOG_ERROR("Unable to read status from file(%s)\r\n", path);
+        return ONLP_STATUS_E_INTERNAL;
+    }
+
+    return ret;
+}
 
 
 int psu_ym2651y_pmbus_info_get(int id, char *node, int *value)
@@ -214,11 +241,34 @@ int psu_serial_number_get(int id, char *serial, int serial_len)
 
     ret = onlp_file_read((uint8_t*)serial, PSU_SERIAL_NUMBER_LEN, &size, "%s%s", prefix, "psu_serial_number");
     if (ret != ONLP_STATUS_OK || size != PSU_SERIAL_NUMBER_LEN) {
+        serial[0] = '\0'; /* SN = NULL */
 		return ONLP_STATUS_E_INTERNAL;
 
     }
     serial[PSU_SERIAL_NUMBER_LEN-1] = '\0';
 
+    return ONLP_STATUS_OK;
+}
+
+int get_i2c_bus_offset(int *bus_offset)
+{
+    int len = 0;
+    char *i2c_bus_0_name = NULL;
+
+    len = onlp_file_read_str(&i2c_bus_0_name, "/sys/bus/i2c/devices/i2c-0/name");
+
+    if(i2c_bus_0_name == NULL || len <= 0){
+        AIM_LOG_ERROR("Unable to read the name sysfs of i2c-0\r\n");
+        AIM_FREE_IF_PTR(i2c_bus_0_name);
+        return ONLP_STATUS_E_INTERNAL;
+    }
+
+    *bus_offset = 0;
+    if(!strncmp(i2c_bus_0_name, "SMBus iSMT", strlen("SMBus iSMT"))){
+        *bus_offset = -1;
+    }
+
+    AIM_FREE_IF_PTR(i2c_bus_0_name);
     return ONLP_STATUS_OK;
 }
 

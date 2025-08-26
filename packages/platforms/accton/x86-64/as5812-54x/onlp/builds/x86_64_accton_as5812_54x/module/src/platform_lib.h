@@ -84,4 +84,13 @@ int psu_ym2401_pmbus_info_set(int id, char *node, int value);
 	#define DEBUG_PRINT(fmt, args...)
 #endif
 
+#define AIM_FREE_IF_PTR(p) \
+    do \
+    { \
+        if (p) { \
+            aim_free(p); \
+            p = NULL; \
+        } \
+    } while (0)
+
 #endif  /* __PLATFORM_LIB_H__ */

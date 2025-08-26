@@ -27,13 +27,8 @@
 #include <onlp/platformi/psui.h>
 #include "platform_lib.h"
 
-#define PSU_STATUS_PRESENT    1
-#define PSU_STATUS_POWER_GOOD 1
-
 #define PSU_NODE_MAX_INT_LEN  8
 #define PSU_NODE_MAX_PATH_LEN 64
-
-#define NUM_OF_SENSOR_PER_PSU 3
 
 #define VALIDATE(_id)                           \
     do {                                        \
@@ -41,27 +36,6 @@
             return ONLP_STATUS_E_INVALID;       \
         }                                       \
     } while(0)
-
-static int 
-psu_status_info_get(int id, char *node, int *value)
-{
-    int ret = 0;
-    
-    *value = 0;
-
-    if (PSU1_ID == id) {
-        ret = onlp_file_read_int(value, "%s%s", PSU1_AC_HWMON_PREFIX, node);
-    }
-    else if (PSU2_ID == id) {
-        ret = onlp_file_read_int(value, "%s%s", PSU2_AC_HWMON_PREFIX, node);
-    }
-
-    if (ret < 0) {
-        return ONLP_STATUS_E_INTERNAL;
-    }
-
-    return ret;
-}
 
 int
 onlp_psui_init(void)
@@ -161,17 +135,6 @@ onlp_psui_info_get(onlp_oid_t id, onlp_psu_info_t* info)
     }
     info->status |= ONLP_PSU_STATUS_PRESENT;
 
-
-    /* Get power good status */
-    if (psu_status_info_get(index, "psu_power_good", &val) != 0) {
-        printf("Unable to read PSU(%d) node(psu_power_good)\r\n", index);
-    }
-
-    if (val != PSU_STATUS_POWER_GOOD) {
-        info->status |=  ONLP_PSU_STATUS_FAILED;
-    }
-
-
     /* Get PSU type
      */
     psu_type = get_psu_type(index, info->model, sizeof(info->model));
@@ -187,6 +150,12 @@ onlp_psui_info_get(onlp_oid_t id, onlp_psu_info_t* info)
             ret = psu_acbel_info_get(info);
             break;
         case PSU_TYPE_UNKNOWN:  /* User insert a unknown PSU or unplugged.*/
+            /* Set the associated oid_table */
+            info->hdr.coids[0] = ONLP_FAN_ID_CREATE(index + CHASSIS_FAN_COUNT);
+            info->hdr.coids[1] = ONLP_THERMAL_ID_CREATE((index-1)*3 + CHASSIS_THERMAL_COUNT + 1);
+            info->hdr.coids[2] = ONLP_THERMAL_ID_CREATE((index-1)*3 + CHASSIS_THERMAL_COUNT + 2);
+            info->hdr.coids[3] = ONLP_THERMAL_ID_CREATE((index-1)*3 + CHASSIS_THERMAL_COUNT + 3);
+
             info->status |= ONLP_PSU_STATUS_UNPLUGGED;
             info->status &= ~ONLP_PSU_STATUS_FAILED;
             ret = ONLP_STATUS_OK;
@@ -195,6 +164,16 @@ onlp_psui_info_get(onlp_oid_t id, onlp_psu_info_t* info)
             ret = ONLP_STATUS_E_UNSUPPORTED;
             break;
     }
+
+        /* Get power good status */
+        if (psu_status_info_get(index, "psu_power_good", &val) != 0) {
+            printf("Unable to read PSU(%d) node(psu_power_good)\r\n", index);
+        }
+
+        if (val != PSU_STATUS_POWER_GOOD) {
+            info->status |=  ONLP_PSU_STATUS_UNPLUGGED;
+            info->caps = 0;
+        }
 
     return ret;
 }
