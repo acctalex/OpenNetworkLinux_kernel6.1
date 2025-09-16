@@ -179,7 +179,7 @@ _onlp_fani_info_get_fan_on_psu(int pid, onlp_fan_info_t* info)
         char file[32];
         snprintf(file, sizeof(file), "psu%d_fan_dir", pid);
 
-        len = onlp_file_read_str(&str, PSU_SYSFS_FORMAT_1, (pid-1), hwmon_idx, file);
+        len = onlp_file_read_str(&str, PSU_SYSFS_FORMAT_1, hwmon_idx, file);
         if (str && len >= 3) {
             if (strncmp(str, "B2F", strlen("B2F")) == 0) {
                 info->status |= ONLP_FAN_STATUS_B2F;
@@ -193,13 +193,19 @@ _onlp_fani_info_get_fan_on_psu(int pid, onlp_fan_info_t* info)
 
     /* get fan speed
      */
-    ret = onlp_file_read_int(&val, PSU_SYSFS_FORMAT, (pid-1), pid, "fan1_input");
+    ret = onlp_file_read_int(&val, PSU_SYSFS_FORMAT, pid, "fan1_input");
     if (ret < 0) {
         AIM_LOG_ERROR("Unable to read status from PSU(%d)\r\n", pid);
         return ONLP_STATUS_E_INTERNAL;
     }
     info->rpm = val;
     info->percentage = (info->rpm * 100)/MAX_PSU_FAN_SPEED;
+
+    /* Get power good status */
+    onlp_file_read_int(&val, PSU_SYSFS_FORMAT, (pid-1), pid, "power_good");
+    if(val != PSU_STATUS_POWER_GOOD) {
+        info->status |= ONLP_FAN_STATUS_FAILED;
+    }
 
     return ONLP_STATUS_OK;
 }

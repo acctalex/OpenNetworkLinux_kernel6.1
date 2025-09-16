@@ -9,6 +9,7 @@ class OnlPlatform_x86_64_accton_as7535_28xb_r0(OnlPlatformAccton,
 
     def baseconfig(self):
         self.insmod('optoe')
+        self.insmod("accton_ipmi_intf")
         for m in [ 'sys', 'cpld', 'fan', 'psu', 'thermal', 'leds', 'fpga']:
             self.insmod("x86-64-accton-as7535-28xb-%s" % m)
 
@@ -29,6 +30,9 @@ class OnlPlatform_x86_64_accton_as7535_28xb_r0(OnlPlatformAccton,
                 ('as7535_28xb_fpga', 0x60, 11),
                 ]
             )
+
+        # initialize pca9548 idle_state
+        subprocess.call('echo -2 | tee /sys/bus/i2c/drivers/pca954x/*-00*/idle_state > /dev/null', shell=True)
 
         # initialize SFP devices
         for port in range(1, 5):

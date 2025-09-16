@@ -37,12 +37,18 @@
 #include "x86_64_accton_as4630_54pe_log.h"
 
 
-#define PREFIX_PATH_ON_CPLD_DEV          "/sys/bus/i2c/devices/3-0060/"
 
-#define NUM_OF_CPLD                      3
+#define NUM_OF_CPLD_VER             4
 #define FAN_DUTY_CYCLE_MAX         (100)
 /* Note, all chassis fans share 1 single duty setting. 
  * Here use fan 1 to represent global fan duty value.*/
+
+static char* cpld_ver_path[NUM_OF_CPLD_VER] = {
+    "/sys/bus/i2c/devices/%d-0065/version",
+    "/sys/bus/i2c/devices/%d-0065/minor_version",
+    "/sys/bus/i2c/devices/3-0060/version",
+    "/sys/bus/i2c/devices/3-0060/minor_version",
+};
 
 const char*
 onlp_sysi_platform_get(void)
@@ -53,18 +59,27 @@ onlp_sysi_platform_get(void)
 int
 onlp_sysi_onie_data_get(uint8_t** data, int* size)
 {
-    uint8_t* rdata = aim_zmalloc(256);
-	
-    if(onlp_file_read(rdata, 256, size, IDPROM_PATH) == ONLP_STATUS_OK) {
-        if(*size == 256) {
-            *data = rdata;
-            return ONLP_STATUS_OK;
-        }
-    }
+	uint8_t* rdata = aim_zmalloc(256);
+    
+    int bus_offset = 0;
+    char path[64];
 
-    aim_free(rdata);
-    *size = 0;
-    return ONLP_STATUS_E_INTERNAL;
+    if(get_i2c_bus_offset(&bus_offset) != ONLP_STATUS_OK)
+        return ONLP_STATUS_E_INTERNAL;
+
+    snprintf(path, sizeof(path), IDPROM_PATH, 1+bus_offset);
+
+	if(onlp_file_read(rdata, 256, size, path) == ONLP_STATUS_OK) {
+		if(*size == 256) {
+			*data = rdata;
+			return ONLP_STATUS_OK;
+		}
+	}
+
+	aim_free(rdata);
+	*size = 0;
+
+	return ONLP_STATUS_E_INTERNAL;
 }
 
 int
@@ -100,20 +115,53 @@ onlp_sysi_oids_get(onlp_oid_t* table, int max)
 int
 onlp_sysi_platform_info_get(onlp_platform_info_t* pi)
 {
-    int ver=0;
-	
-    if(onlp_file_read_int(&ver, "%s/version", PREFIX_PATH_ON_CPLD_DEV) < 0)
+    int i, v[NUM_OF_CPLD_VER] = {0};
+    int bus_offset = 0;
+    char path[64];
+    onlp_onie_info_t onie;
+    char *bios_ver = NULL;
+
+    if(get_i2c_bus_offset(&bus_offset) != ONLP_STATUS_OK) {
         return ONLP_STATUS_E_INTERNAL;
-		
-    pi->cpld_versions = aim_fstrdup("%d", ver);
-	
-    return 0;
+    }
+
+    for (i = 0; i < AIM_ARRAYSIZE(cpld_ver_path); i++) {
+        v[i] = 0;
+
+        if (i == 0 || i == 1) {
+            if(onlp_file_read_int(v+i, cpld_ver_path[i], 1+bus_offset) < 0) {
+                return ONLP_STATUS_E_INTERNAL;
+            }
+        } else if (i == 2 || i == 3) {
+            if(onlp_file_read_int(v+i, cpld_ver_path[i]) < 0) {
+                return ONLP_STATUS_E_INTERNAL;
+            }
+        }
+    }
+
+    onlp_file_read_str(&bios_ver, BIOS_VER_PATH);
+    
+    snprintf(path, sizeof(path), IDPROM_PATH, 1+bus_offset);
+    onlp_onie_decode_file(&onie, path);
+
+    pi->cpld_versions = aim_fstrdup("\r\n\t   CPU CPLD(0x65): %02X.%02X"
+                                    "\r\n\t   Main CPLD(0x60): %02X.%02X\r\n"
+                                    , v[0], v[1], v[2], v[3]);
+
+    pi->other_versions = aim_fstrdup("\r\n\t   BIOS: %s\r\n\t   ONIE: %s",
+                                    bios_ver, onie.onie_version);
+
+    AIM_FREE_IF_PTR(bios_ver);
+    onlp_onie_info_free(&onie);
+
+    return ONLP_STATUS_OK;
 }
 
 void
 onlp_sysi_platform_info_free(onlp_platform_info_t* pi)
 {
     aim_free(pi->cpld_versions);
+    aim_free(pi->other_versions);
 }
 
 /* Temperature Policy

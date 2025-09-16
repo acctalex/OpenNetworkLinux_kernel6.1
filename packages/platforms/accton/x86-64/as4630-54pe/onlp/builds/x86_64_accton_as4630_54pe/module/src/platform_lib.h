@@ -37,6 +37,9 @@
 #define PSU1_ID 1
 #define PSU2_ID 2
 
+#define PSU_STATUS_PRESENT    1
+#define PSU_STATUS_POWER_GOOD 1
+
 #define PSU_NODE_MAX_INT_LEN  8
 #define PSU_NODE_MAX_PATH_LEN 64
 
@@ -58,21 +61,26 @@
 #define CPLD_NODE_PATH	"/sys/bus/i2c/devices/i2c-3/3-0060/"
 #define FAN_NODE(node)	CPLD_NODE_PATH#node
 
-#define IDPROM_PATH "/sys/bus/i2c/devices/1-0057/eeprom"
+#define IDPROM_PATH "/sys/bus/i2c/devices/%d-0057/eeprom"
+#define BIOS_VER_PATH "/sys/devices/virtual/dmi/id/bios_version"
 
 int onlp_file_write_integer(char *filename, int value);
 int onlp_file_read_binary(char *filename, char *buffer, int buf_size, int data_len);
 int onlp_file_read_string(char *filename, char *buffer, int buf_size, int data_len);
 
 int psu_pmbus_info_get(int id, char *node, int *value);
+int psu_status_info_get(int id, char *node, int *value);
 int psu_ym2651y_pmbus_info_get(int id, char *node, int *value);
 int psu_ym2651y_pmbus_info_set(int id, char *node, int value);
+
+int get_i2c_bus_offset(int *bus_offset);
 
 typedef enum psu_type {
     PSU_TYPE_UNKNOWN,
     PSU_TYPE_ACBEL,
     PSU_TYPE_YM2651Y,
     PSU_TYPE_YPEB1200A,
+    PSU_TYPE_UP1K21R_1085G,
     PSU_TYPE_AC_F2B,
     PSU_TYPE_AC_B2F
 } psu_type_t;
@@ -87,6 +95,15 @@ int psu_serial_number_get(int id, char *serial, int serial_len);
 #else
     #define DEBUG_PRINT(format, ...)  
 #endif
+
+#define AIM_FREE_IF_PTR(p) \
+    do \
+    { \
+        if (p) { \
+            aim_free(p); \
+            p = NULL; \
+        } \
+    } while (0)
 
 #endif  /* __PLATFORM_LIB_H__ */
 

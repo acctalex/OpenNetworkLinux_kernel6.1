@@ -180,25 +180,26 @@ onlp_psui_info_get(onlp_oid_t id, onlp_psu_info_t* info)
     if (psu_status_info_get(index, "psu_power_good", &val) != 0) {
         AIM_LOG_ERROR("Unable to read PSU(%d) node(psu_power_good)\r\n", index);
     }
-    
-    if (val != PSU_STATUS_POWER_GOOD) {
-        info->status |=  ONLP_PSU_STATUS_FAILED;
-    }
 
     /* Get PSU type
      */
     psu_type = get_psu_type(index, info->model, sizeof(info->model));
     
-    
     switch (psu_type) {
-        case PSU_TYPE_ACBEL:            
-        case PSU_TYPE_YESM1300:         
+        case PSU_TYPE_ACBEL_FSH082_F2B:
+        case PSU_TYPE_ACBEL_FSH095_B2F:
+        case PSU_TYPE_3Y_YESM1300AM_2A_F2B:
+        case PSU_TYPE_3Y_YESM1300AM_2R_B2F:
             ret = psu_data_info_get(info);
             break;
         case PSU_TYPE_YM2651Y:
             ret = psu_ym2651y_info_get(info);
             break;
         case PSU_TYPE_UNKNOWN:  /* User insert a unknown PSU or unplugged.*/
+            /* Set the associated oid_table */
+            info->hdr.coids[0] = ONLP_FAN_ID_CREATE(index + CHASSIS_FAN_COUNT);
+            info->hdr.coids[1] = ONLP_THERMAL_ID_CREATE(index + CHASSIS_THERMAL_COUNT);
+
             info->status |= ONLP_PSU_STATUS_UNPLUGGED;
             info->status &= ~ONLP_PSU_STATUS_FAILED;
             ret = ONLP_STATUS_OK;
@@ -206,6 +207,11 @@ onlp_psui_info_get(onlp_oid_t id, onlp_psu_info_t* info)
         default:
             ret = ONLP_STATUS_E_UNSUPPORTED;
             break;
+    }
+
+    if (val != PSU_STATUS_POWER_GOOD) {
+        info->status |=  ONLP_PSU_STATUS_UNPLUGGED;
+        info->caps = 0;
     }
 
     return ret;

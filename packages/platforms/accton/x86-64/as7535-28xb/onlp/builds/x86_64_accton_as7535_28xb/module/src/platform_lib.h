@@ -38,12 +38,26 @@
 #define PSU1_ID 1
 #define PSU2_ID 2
 
+#define PSU_STATUS_PRESENT 1
+#define PSU_STATUS_POWER_GOOD 1
+
 #define PSU_SYSFS_PATH "/sys/devices/platform/as7535_28xb_psu/"
 #define FAN_BOARD_PATH "/sys/devices/platform/as7535_28xb_fan/"
 #define SYS_LED_PATH   "/sys/devices/platform/as7535_28xb_led/"
 #define IDPROM_PATH "/sys/devices/platform/as7535_28xb_sys/eeprom"
+#define BIOS_VER_PATH  "/sys/devices/virtual/dmi/id/bios_version"
+#define BMC_VER1_PATH  "/sys/devices/platform/ipmi_bmc.0/firmware_revision"
+#define BMC_VER2_PATH  "/sys/devices/platform/ipmi_bmc.0/aux_firmware_revision"
+
+#define PSU_SYSFS_NODE(node) PSU_SYSFS_PATH#node
 
 int get_pcb_id();
+
+typedef enum psu_type {
+    PSU_TYPE_PS_2601_6R = 0,
+    PSU_TYPE_DD_2601_6R,
+    PSU_TYPE_UNKNOWN,
+} psu_type_t;
 
 enum onlp_thermal_id {
     THERMAL_RESERVED = 0,
@@ -65,6 +79,13 @@ enum onlp_thermal_id {
     THERMAL_COUNT
 };
 
+enum reset_dev_type {
+    WARM_RESET_MAC = 1,
+    WARM_RESET_PHY, /* Not supported */
+    WARM_RESET_MUX,
+    WARM_RESET_MAX
+};
+
 enum onlp_led_id {
     LED_LOC = 1,
     LED_DIAG,
@@ -81,6 +102,7 @@ enum onlp_fan_dir {
 };
 
 enum onlp_fan_dir onlp_get_fan_dir(int fid);
+psu_type_t get_psu_type(int tid, int psu_tid_start, char* modelname, int modelname_len);
 
 #define AIM_FREE_IF_PTR(p) \
     do \

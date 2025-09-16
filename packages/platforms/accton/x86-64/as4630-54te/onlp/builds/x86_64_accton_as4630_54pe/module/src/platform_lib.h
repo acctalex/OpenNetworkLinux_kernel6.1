@@ -37,6 +37,9 @@
 #define PSU1_ID 1
 #define PSU2_ID 2
 
+#define PSU_STATUS_PRESENT 1
+#define PSU_STATUS_POWER_GOOD 1
+
 #define PSU_NODE_MAX_INT_LEN  8
 #define PSU_NODE_MAX_PATH_LEN 64
 
@@ -52,15 +55,21 @@
 #define CPLD_NODE_PATH    "/sys/bus/i2c/devices/i2c-3/3-0060/"
 #define FAN_NODE(node)    CPLD_NODE_PATH#node
 
-#define IDPROM_PATH "/sys/bus/i2c/devices/1-0057/eeprom"
+#define IDPROM_PATH   "/sys/bus/i2c/devices/%d-0057/eeprom"
+#define IDPROM_PATH_1 "/sys/bus/i2c/devices/0-0057/eeprom"
+#define IDPROM_PATH_2 "/sys/bus/i2c/devices/1-0057/eeprom"
 
 int psu_pmbus_info_get(int id, char *node, int *value);
+int psu_status_info_get(int id, char *node, int *value);
+int get_i2c_bus_offset(int *bus_offset);
 
 typedef enum psu_type {
     PSU_TYPE_UNKNOWN,
     PSU_TYPE_YM1151D_F2B,
     PSU_TYPE_YM1151D_B2F,
-    PSU_TYPE_YM1151F_F2B
+    PSU_TYPE_YM1151F_F2B,
+    PSU_TYPE_UPD1501SA_1190G_F2B,
+    PSU_TYPE_UPD1501SA_1290G_B2F
 } psu_type_t;
 
 psu_type_t get_psu_type(int id, char* modelname, int modelname_len);

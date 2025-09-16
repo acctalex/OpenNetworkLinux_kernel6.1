@@ -158,6 +158,12 @@ _onlp_fani_info_get_fan_on_psu(int pid, onlp_fan_info_t* info)
 
 	info->status |= ONLP_FAN_STATUS_PRESENT;
 
+    /* Get power good status */
+    onlp_file_read_int(&val, "%s""psu%d_power_good", PSU_SYSFS_PATH, pid);
+    if(val != PSU_STATUS_POWER_GOOD) {
+        info->status |= ONLP_FAN_STATUS_FAILED;
+    }
+
     /* get fan direction
      */
     len = onlp_file_read_str(&str, "%s""psu%d_fan_dir", PSU_SYSFS_PATH, pid);

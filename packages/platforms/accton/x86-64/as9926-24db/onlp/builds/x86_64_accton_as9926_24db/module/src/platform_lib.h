@@ -36,6 +36,9 @@
 #define PSU1_ID 1
 #define PSU2_ID 2
 
+#define PSU_STATUS_PRESENT     1
+#define PSU_STATUS_POWER_GOOD  1
+
 #define PSU_SYSFS_PATH  "/sys/devices/platform/as9926_24db_psu/"
 #define FAN_BOARD_PATH	"/sys/devices/platform/as9926_24db_fan/"
 #define IDPROM_PATH     "/sys/devices/platform/as9926_24db_sys/eeprom"
@@ -57,6 +60,11 @@ enum onlp_thermal_id
 	THERMAL_1_ON_PSU2,
 };
 
+enum reset_dev_type {
+	WARM_RESET_MAC = 1,
+	WARM_RESET_MAX
+};
+
 #define DEBUG_MODE 0
 
 #if (DEBUG_MODE == 1)
@@ -65,6 +73,15 @@ enum onlp_thermal_id
 #else
 	#define DEBUG_PRINT(fmt, args...)
 #endif
+
+#define AIM_FREE_IF_PTR(p) \
+    do \
+    { \
+        if (p) { \
+            aim_free(p); \
+            p = NULL; \
+        } \
+    } while (0)
 
 #endif  /* __PLATFORM_LIB_H__ */
 

@@ -70,9 +70,15 @@ int onlp_get_psu_hwmon_idx(int pid)
     int ret, hwmon_idx, max_hwmon_idx = 20;
 
     for (hwmon_idx = 0; hwmon_idx <= max_hwmon_idx; hwmon_idx++) {
-        snprintf(path, sizeof(path), "/sys/devices/platform/as9817_64_psu.%d/hwmon/hwmon%d/", pid-1, hwmon_idx);
+        snprintf(path, sizeof(path), "/sys/devices/platform/as9817_64_psu/hwmon/hwmon%d/", hwmon_idx);
 
-        ret = onlp_file_find(path, "name", &file);
+        if (pid == 1)
+            ret = onlp_file_find(path, "psu1_present", &file);
+        else if (pid == 2)
+            ret = onlp_file_find(path, "psu2_present", &file);
+        else
+            return -1;
+ 
         AIM_FREE_IF_PTR(file);
 
         if (ONLP_STATUS_OK == ret)
@@ -112,4 +118,60 @@ as9817_64_platform_id_t get_platform_id(void)
     }
 
     return (pid == 0) ? AS9817_64O : AS9817_64D;
+}
+
+/**
+ * get_bmc_version - Get BMC version as int array
+ * @ver: int[3], ver[0]=major, ver[1]=minor, ver[2]=aux last byte
+ *
+ * Return: ONLP_STATUS_OK on success, or ONLP error code
+ */
+int get_bmc_version(int *ver)
+{
+    char *tmp;
+    char primary_fw_ver[32] = {0};
+    char aux_fw_raw[64] = {0};
+    const char *last_aux = NULL;
+    int len;
+
+    if (!ver) {
+        return ONLP_STATUS_E_INVALID;
+    }
+    memset(ver, 0, sizeof(int) * 3);
+
+    len = onlp_file_read_str(&tmp, BMC_VER1_PATH);
+    if (tmp && len) {
+        memcpy(primary_fw_ver, tmp, len);
+        primary_fw_ver[len] = '\0';
+    } else {
+        return ONLP_STATUS_E_INTERNAL;
+    }
+    AIM_FREE_IF_PTR(tmp);
+
+    len = onlp_file_read_str(&tmp, BMC_VER2_PATH);
+    if (tmp && len) {
+        memcpy(aux_fw_raw, tmp, len);
+        aux_fw_raw[len] = '\0';
+    } else {
+        return ONLP_STATUS_E_INTERNAL;
+    }
+    AIM_FREE_IF_PTR(tmp);
+
+    primary_fw_ver[strcspn(primary_fw_ver, "\n")] = '\0';
+    aux_fw_raw[strcspn(aux_fw_raw, "\n")] = '\0';
+
+    /* Parse main version: "0.3" => ver[0]=0, ver[1]=3 */
+    if (sscanf(primary_fw_ver, "%d.%d", &ver[0], &ver[1]) != 2) {
+        return ONLP_STATUS_E_INTERNAL;
+    }
+
+    /* Get last AUX byte (e.g., from "0x00 0x00 0x00 0x02") */
+    last_aux = strrchr(aux_fw_raw, ' ');
+    last_aux = last_aux ? last_aux + 1 : aux_fw_raw;
+
+    if (sscanf(last_aux, "0x%x", &ver[2]) != 1) {
+        return ONLP_STATUS_E_INTERNAL;
+    }
+
+    return ONLP_STATUS_OK;
 }

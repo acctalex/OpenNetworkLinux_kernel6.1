@@ -140,3 +140,22 @@ int psu_acbel_pmbus_info_set(int id, char *node, int value)
 
     return ONLP_STATUS_OK;
 }
+
+int psu_status_info_get(int id, char *node, int *value)
+{
+    int ret = 0;
+    *value = 0;
+
+    if (PSU1_ID == id) {
+        ret = onlp_file_read_int(value, "%s%s", PSU1_AC_HWMON_PREFIX, node);
+    }
+    else if (PSU2_ID == id) {
+        ret = onlp_file_read_int(value, "%s%s", PSU2_AC_HWMON_PREFIX, node);
+    }
+
+    if (ret < 0) {
+        return ONLP_STATUS_E_INTERNAL;
+    }
+
+    return ret;
+}

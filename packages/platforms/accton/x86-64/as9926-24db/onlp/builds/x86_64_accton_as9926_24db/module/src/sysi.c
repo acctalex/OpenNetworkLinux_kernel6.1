@@ -37,6 +37,9 @@
 #include "x86_64_accton_as9926_24db_int.h"
 #include "x86_64_accton_as9926_24db_log.h"
 
+#define BIOS_VER_PATH "/sys/devices/virtual/dmi/id/bios_version"
+#define BMC_VER_PREFIX "/sys/devices/pci0000:00/0000:00:1f.0/IPI0001:00/bmc/"
+
 const char* onlp_sysi_platform_get(void)
 {
 	return "x86-64-accton-as9926-24db-r0";
@@ -96,42 +99,65 @@ typedef struct cpld_version {
 
 int onlp_sysi_platform_info_get(onlp_platform_info_t* pi)
 {
-	int i, ret;
-	cpld_version_t cplds[] = { { "mb_cpld2_ver", 0, "Mainboard-CPLD#2"},
-				   { "mb_cpld3_ver", 0, "Mainboard-CPLD#3"},
-				   { "cpu_cpld_ver", 0, "CPU-CPLD"},
-				   { "fan_cpld_ver", 0, "FAN-CPLD"},
-				   { "fpga_cpld_ver", 0, "FPGA-CPLD"} };
-	/* Read CPLD version
-	 */
-	for (i = 0; i < AIM_ARRAYSIZE(cplds); i++) {
-		ret = onlp_file_read_int(&cplds[i].version, 
-					 CPLD_VERSION_FORMAT, 
-					 cplds[i].attr_name);
+    int i, major_ver, minor_ver, aux_ver[4];
+    onlp_onie_info_t onie;
+    char *bios_ver = NULL;
+    char *bmc_fw_ver = NULL;
+    char *aux_fw_ver = NULL;
+    cpld_version_t cplds[] = { { "mb_cpld2_ver", 0, "Main CPLD2(0x61)"},
+                   { "mb_cpld3_ver", 0, "Main CPLD3(0x62)"},
+                   { "cpu_cpld_ver", 0, "CPU CPLD(0x65)"},
+                   { "fan_cpld_ver", 0, "FAN CPLD(0x66)"},
+                   { "fpga_cpld_ver", 0, "FPGA(0x68)"} };
+    /* BMC version
+       Major: decimal, Minor: hex, Aux[0]: hex, Aux[1]: hex, Aux[2]: hex,
+       Aux[3]: hex. 
+       Only print Major, Minor and Aux[3].
+       Transfer the three version to decimal and then hex print  */
+    onlp_file_read_str(&bmc_fw_ver, BMC_VER_PREFIX"firmware_revision");
+    sscanf(bmc_fw_ver, "%d.%x", &major_ver, &minor_ver);
 
-		if (ret < 0) {
-			AIM_LOG_ERROR("Unable to read version from \
-				       CPLD(%s)\r\n", 
-				       cplds[i].attr_name);
-			return ONLP_STATUS_E_INTERNAL;
-		}
-	}
+    onlp_file_read_str(&aux_fw_ver, BMC_VER_PREFIX"aux_firmware_revision");
+    sscanf(aux_fw_ver, "0x%x 0x%x 0x%x 0x%x", &aux_ver[1], &aux_ver[2], &aux_ver[3], &aux_ver[4]);
 
-	pi->cpld_versions = aim_fstrdup("%s:%d, %s:%d, %s:%d, %s:%d, %s:%d", 
-					cplds[0].description, 
-					cplds[0].version,
-					cplds[1].description, 
-					cplds[1].version,
-					cplds[2].description, 
-					cplds[2].version,
-					cplds[3].description, 
-					cplds[3].version,
-					cplds[4].description, 
-					cplds[4].version);
-	return ONLP_STATUS_OK;
+    /* BIOS version */
+    onlp_file_read_str(&bios_ver, BIOS_VER_PATH);
+    /* ONIE version */
+    onlp_onie_decode_file(&onie, IDPROM_PATH);
+    /* Read CPLD version
+     */
+    for (i = 0; i < AIM_ARRAYSIZE(cplds); i++) {
+        onlp_file_read_int(&cplds[i].version, 
+                            CPLD_VERSION_FORMAT, 
+                            cplds[i].attr_name);
+    }
+
+    pi->cpld_versions = aim_fstrdup("\r\n\t   %s: %02X"
+                                    "\r\n\t   %s: %02X"
+                                    "\r\n\t   %s: %02X"
+                                    "\r\n\t   %s: %02X"
+                                    "\r\n\t   %s: %02X"
+                                    , cplds[0].description, cplds[0].version
+                                    , cplds[1].description, cplds[1].version
+                                    , cplds[2].description, cplds[2].version
+                                    , cplds[3].description, cplds[3].version
+                                    , cplds[4].description, cplds[4].version);
+
+    pi->other_versions = aim_fstrdup("\r\n\t   BIOS: %s\r\n\t   ONIE: %s"
+                                     "\r\n\t   BMC: %02X.%02X.%02X"
+                                    ,bios_ver, onie.onie_version
+                                    ,major_ver, minor_ver, aux_ver[4]);
+
+    onlp_onie_info_free(&onie);
+    AIM_FREE_IF_PTR(bios_ver);
+    AIM_FREE_IF_PTR(bmc_fw_ver);
+    AIM_FREE_IF_PTR(aux_fw_ver);
+
+    return ONLP_STATUS_OK;
 }
 
 void onlp_sysi_platform_info_free(onlp_platform_info_t* pi)
 {
-	aim_free(pi->cpld_versions);
+    aim_free(pi->cpld_versions);
+    aim_free(pi->other_versions);
 }
