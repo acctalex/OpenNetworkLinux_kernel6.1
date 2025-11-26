@@ -52,8 +52,8 @@
 #define FPGA_VER_PATH  "/sys/devices/platform/as9817_64_sys/fpga_version"
 #define FGPA_MAC_MIN_TEMP_PATH "/sys/devices/platform/as9817_64_fpga/mac_min_temp"
 #define FGPA_MAC_MAX_TEMP_PATH "/sys/devices/platform/as9817_64_fpga/mac_max_temp"
-#define BMC_VER1_PATH  "/sys/devices/platform/ipmi_bmc.0/firmware_revision"
-#define BMC_VER2_PATH  "/sys/devices/platform/ipmi_bmc.0/aux_firmware_revision"
+#define BMC_VER1_PATH  "/sys/bus/platform/drivers/ipmi_si/IPI0001:00/bmc/firmware_revision"
+#define BMC_VER2_PATH  "/sys/bus/platform/drivers/ipmi_si/IPI0001:00/bmc/aux_firmware_revision"
 #define WARM_RESET_FORMAT "/sys/devices/platform/as9817_64_sys/reset_%s"
 
 enum onlp_thermal_id {
