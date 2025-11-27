@@ -65,6 +65,9 @@
 #define IDPROM_PATH_1 "/sys/class/i2c-adapter/i2c-0/0-0057/eeprom"
 #define IDPROM_PATH_2 "/sys/class/i2c-adapter/i2c-0/0-0056/eeprom"
 
+#define BIOS_VER_PATH "/sys/devices/virtual/dmi/id/bios_version"
+#define MFU_VER_PATH "/var/tmp/last_updated_MFU_version"
+
 #define WARM_RESET_FORMAT "/sys/bus/i2c/devices/19-0060/reset_mac"
 
 int onlp_file_write_integer(char *filename, int value);
@@ -98,7 +101,7 @@ int psu_serial_number_get(int id, char *serial, int serial_len, char* model_name
 #if (DEBUG_MODE == 1)
     #define DEBUG_PRINT(format, ...)   printf(format, __VA_ARGS__)
 #else
-    #define DEBUG_PRINT(format, ...)  
+    #define DEBUG_PRINT(format, ...)
 #endif
 
 #define AIM_FREE_IF_PTR(p) \

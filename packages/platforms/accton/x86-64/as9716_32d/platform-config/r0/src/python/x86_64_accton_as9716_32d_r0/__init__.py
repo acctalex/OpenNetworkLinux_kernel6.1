@@ -64,6 +64,23 @@ def config_sfp_retimer():
 
     return True
 
+def get_mfu_ver_file():
+    cmd_list = [
+        'mkdir -p /mnt/onie-boot',
+        'mount -L ONIE-BOOT /mnt/onie-boot',
+        'cp -a /mnt/onie-boot/onie/update/last_updated_MFU_version /var/tmp',
+        'umount /mnt/onie-boot'
+    ]
+
+    for cmd in cmd_list:
+        process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        process.communicate()
+        if process.returncode != 0:
+            print 'error! return code of cmd ' + cmd +': ', process.returncode
+            return False
+
+    return True
+
 class OnlPlatform_x86_64_accton_as9716_32d_r0(OnlPlatformAccton,
                                               OnlPlatformPortConfig_48x25_6x100):
 
@@ -78,19 +95,19 @@ class OnlPlatform_x86_64_accton_as9716_32d_r0(OnlPlatformAccton,
             self.insmod("x86-64-accton-as9716-32d-%s.ko" % m)
 
         ########### initialize I2C bus 0 ###########
-        # initialize multiplexer (PCA9548)        
+        # initialize multiplexer (PCA9548)
         self.new_i2c_device('pca9548', 0x77, 0)
         # initiate multiplexer (PCA9548)
         self.new_i2c_devices(
             [
-                # initiate multiplexer (PCA9548)                
+                # initiate multiplexer (PCA9548)
                 ('pca9548', 0x72, 1),
-                ('pca9548', 0x76, 1),                
+                ('pca9548', 0x76, 1),
             ]
         )
         self.new_i2c_devices(
             [
-                # initiate multiplexer (PCA9548)                
+                # initiate multiplexer (PCA9548)
                 ('pca9548', 0x72, 2),
                 ('pca9548', 0x73, 2), 
                 ('pca9548', 0x74, 2),
@@ -101,7 +118,7 @@ class OnlPlatform_x86_64_accton_as9716_32d_r0(OnlPlatformAccton,
         self.new_i2c_devices([
             # initialize CPLD
              #initiate CPLD
-            ('as9716_32d_fpga', 0x60, 19),            
+            ('as9716_32d_fpga', 0x60, 19),
             ('as9716_32d_cpld1', 0x61, 20),
             ('as9716_32d_cpld2', 0x62, 21),
             ('as9716_32d_cpu_cpld', 0x65, 0),
@@ -111,7 +128,7 @@ class OnlPlatform_x86_64_accton_as9716_32d_r0(OnlPlatformAccton,
               # initiate chassis fan
             ('as9716_32d_fan', 0x66, 17),
 
-            # inititate LM75           
+            # inititate LM75
             ('lm75', 0x48, 18),
             ('lm75', 0x49, 18),
             ('lm75', 0x4a, 18),
@@ -140,9 +157,9 @@ class OnlPlatform_x86_64_accton_as9716_32d_r0(OnlPlatformAccton,
                 self.new_i2c_device('optoe1', 0x50, port+24)
             else:
                 self.new_i2c_device('optoe2', 0x50, port+24)
-            
+
             subprocess.call('echo port%d > /sys/bus/i2c/devices/%d-0050/port_name' % (port, port+24), shell=True)
-       
+
         #Dut to new board eeprom i2c-addr is 0x57, old board eeprom i2c-addr is 0x56. So need to check and set correct i2c-addr sysfs
         ret=eeprom_check()
         if ret==0:
@@ -152,4 +169,6 @@ class OnlPlatform_x86_64_accton_as9716_32d_r0(OnlPlatformAccton,
             self.new_i2c_device('24c02', 0x56, 0)
 
         config_sfp_retimer()
+        get_mfu_ver_file()
+
         return True
