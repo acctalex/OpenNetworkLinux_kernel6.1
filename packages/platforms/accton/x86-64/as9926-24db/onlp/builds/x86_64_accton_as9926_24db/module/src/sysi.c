@@ -38,7 +38,7 @@
 #include "x86_64_accton_as9926_24db_log.h"
 
 #define BIOS_VER_PATH "/sys/devices/virtual/dmi/id/bios_version"
-#define BMC_VER_PREFIX "/sys/devices/pci0000:00/0000:00:1f.0/IPI0001:00/bmc/"
+#define BMC_VER_PREFIX "/sys/bus/platform/drivers/ipmi_si/IPI0001:00/bmc/"
 
 const char* onlp_sysi_platform_get(void)
 {

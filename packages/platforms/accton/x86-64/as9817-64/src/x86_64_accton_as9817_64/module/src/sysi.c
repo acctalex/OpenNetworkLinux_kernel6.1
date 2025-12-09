@@ -44,8 +44,6 @@
 #define BMC_FILE_RETRY_COUNT 3             // Retry count for file read/write operations
 #define BMC_FILE_RETRY_DELAY_US 1000000    // Delay between retries (in microseconds, 1s)
 
-#define BMC_VER1_PATH  "/sys/devices/platform/ipmi_bmc.0/firmware_revision"
-#define BMC_VER2_PATH  "/sys/devices/platform/ipmi_bmc.0/aux_firmware_revision"
 #define BIOS_VER_PATH  "/sys/devices/virtual/dmi/id/bios_version"
 
 typedef struct temp_reader_data {
