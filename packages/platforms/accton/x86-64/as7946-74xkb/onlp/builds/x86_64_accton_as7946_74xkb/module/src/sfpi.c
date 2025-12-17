@@ -28,9 +28,25 @@
 #include <onlplib/file.h>
 #include "platform_lib.h"
 
-#define EEPROM_I2C_ADDR     0x50
-#define EEPROM_START_OFFSET 0x0
 #define NUM_OF_SFP_PORT     74
+
+/* QSFP device address of eeprom */
+#define PORT_EEPROM_DEVADDR 0x50
+
+/* QSFP eeprom offsets*/
+#define QSFP_EEPROM_OFFSET_IDENTIFIER 0x0
+#define QSFP_EEPROM_OFFSET_TXDIS 0x56
+#define QSFP_EEPROM_OFFSET_BANK_SELECT 0x7E
+#define QSFP_EEPROM_OFFSET_PAGE_SELECT 0x7F
+
+/* QSFP DD Specific*/
+#define QSFP_DD_IDENTIFIER 0x18
+#define QSFP_DD_PAGE_ADMIN_INFO 0x0
+#define QSFP_DD_PAGE_ADVERTISING 0x1
+#define QSFP_DD_PAGE_LANE_CTRL 0x10
+#define QSFP_DD_P01H_OFFSET_CONTROL_1 0x9B
+#define QSFP_DD_P01H_TX_DISABLE_SUPPORT 0x2
+#define QSFP_DD_P10H_OFFSET_OUTPUT_DISABLE_TX 0x82
 
 #define VALIDATE_SFP(_port) \
     do { \
@@ -259,30 +275,64 @@ onlp_sfpi_dev_writew(int port, uint8_t devaddr, uint8_t addr, uint16_t value)
 
 int
 onlp_sfpi_control_set(int port, onlp_sfp_control_t control, int value)
-{
+{ 
     int rv = ONLP_STATUS_OK;
     char *path = NULL;
+    int present = 0;
+	int identifier = 0;
+
+    if (port < 0 || port >= 74) {
+            return ONLP_STATUS_E_UNSUPPORTED;
+    }
+
     switch(control) {
     case ONLP_SFP_CONTROL_TX_DISABLE:
     {
-        VALIDATE_SFP(port);
+        if(port >= 0 && port <= 9) {
+            present = onlp_sfpi_is_present(port);
+            if (present == 1) {
+                identifier = onlp_sfpi_dev_readb(port, PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_IDENTIFIER);
 
-        switch (port) {
-        case 0 ... 24:
-            path = MODULE_TXDISABLE_MAIN_BOARD_CPLD1_FORMAT;
-            break;
-        case 25 ... 49:
-            path = MODULE_TXDISABLE_MAIN_BOARD_CPLD2_FORMAT;
-            break;
-        case 50 ... 73:
-            path = MODULE_TXDISABLE_MAIN_BOARD_CPLD3_FORMAT;
-            break;
-        default:
-            break;
-        }
-        if (onlp_file_write_int(value, path, (port+1)) < 0) {
-            AIM_LOG_ERROR("Unable to set tx_disable status to port(%d)\r\n", port);
-            rv = ONLP_STATUS_E_INTERNAL;
+                if (identifier == QSFP_DD_IDENTIFIER) {
+                    onlp_sfpi_dev_writeb(port, PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_PAGE_SELECT, QSFP_DD_PAGE_ADVERTISING);
+
+                    if (onlp_sfpi_dev_readb(port, PORT_EEPROM_DEVADDR, QSFP_DD_P01H_OFFSET_CONTROL_1) & QSFP_DD_P01H_TX_DISABLE_SUPPORT) {
+                        onlp_sfpi_dev_writeb(port, PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_BANK_SELECT, 0);
+                        onlp_sfpi_dev_writeb(port, PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_PAGE_SELECT, QSFP_DD_PAGE_LANE_CTRL);
+                        onlp_sfpi_dev_writeb(port, PORT_EEPROM_DEVADDR, QSFP_DD_P10H_OFFSET_OUTPUT_DISABLE_TX, value);
+                        rv = ONLP_STATUS_OK;
+                    } else {
+                        AIM_LOG_ERROR("Setting tx disable to port(%d) is not supported\r\n", port);
+                        rv = ONLP_STATUS_E_UNSUPPORTED;
+                    }
+                    onlp_sfpi_dev_writeb(port, PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_PAGE_SELECT, QSFP_DD_PAGE_ADMIN_INFO);
+                } else { /* QSFP */
+                    /* txdis valid bit(bit0-bit3), xxxx 1111 */
+                    value = value&0xf;
+                    onlp_sfpi_dev_writeb(port, PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_TXDIS, value);
+                    rv = ONLP_STATUS_OK;
+                }
+            } else {
+                rv = ONLP_STATUS_E_INTERNAL;
+            }
+        } else {
+            switch (port) {
+            case 10 ... 24:
+                path = MODULE_TXDISABLE_MAIN_BOARD_CPLD1_FORMAT;
+                break;
+            case 25 ... 49:
+                path = MODULE_TXDISABLE_MAIN_BOARD_CPLD2_FORMAT;
+                break;
+            case 50 ... 73:
+                path = MODULE_TXDISABLE_MAIN_BOARD_CPLD3_FORMAT;
+                break;
+            default:
+                break;
+            }
+            if (onlp_file_write_int(value, path, (port+1)) < 0) {
+                AIM_LOG_ERROR("Unable to set tx_disable status to port(%d)\r\n", port);
+                rv = ONLP_STATUS_E_INTERNAL;
+            }
         }
         break;
     }
@@ -338,6 +388,14 @@ onlp_sfpi_control_get(int port, onlp_sfp_control_t control, int* value)
 {
     int rv = ONLP_STATUS_OK;
     char *path = NULL;
+    int present = 0;
+	int identifier = 0;
+	int tx_dis = 0;
+
+    if (port < 0 || port >= 74) {
+            return ONLP_STATUS_E_UNSUPPORTED;
+    }
+
     switch(control) {
     case ONLP_SFP_CONTROL_RX_LOS:
     {
@@ -367,24 +425,42 @@ onlp_sfpi_control_get(int port, onlp_sfp_control_t control, int* value)
         break;
     case ONLP_SFP_CONTROL_TX_DISABLE:
     {
-        VALIDATE_SFP(port);
+        if (port >= 0 && port <= 9) {
+            present = onlp_sfpi_is_present(port);
+            if (present == 1) {
+                identifier = onlp_sfpi_dev_readb(port, PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_IDENTIFIER);
 
-        switch (port) {
-        case 0 ... 24:
-            path = MODULE_TXDISABLE_MAIN_BOARD_CPLD1_FORMAT;
-            break;
-        case 25 ... 49:
-            path = MODULE_TXDISABLE_MAIN_BOARD_CPLD2_FORMAT;
-            break;
-        case 50 ... 73:
-            path = MODULE_TXDISABLE_MAIN_BOARD_CPLD3_FORMAT;
-            break;
-        default:
-            break;
-        }
-        if (onlp_file_read_int(value, path, (port+1)) < 0) {
-            AIM_LOG_ERROR("Unable to read tx_disabled status from port(%d)\r\n", port);
-            rv = ONLP_STATUS_E_INTERNAL;
+                if (identifier == QSFP_DD_IDENTIFIER) {
+                    onlp_sfpi_dev_writeb(port, PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_BANK_SELECT, 0);
+                    onlp_sfpi_dev_writeb(port, PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_PAGE_SELECT, QSFP_DD_PAGE_LANE_CTRL);
+                    tx_dis = onlp_sfpi_dev_readb(port, PORT_EEPROM_DEVADDR, QSFP_DD_P10H_OFFSET_OUTPUT_DISABLE_TX);
+                    onlp_sfpi_dev_writeb(port, PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_PAGE_SELECT, QSFP_DD_PAGE_ADMIN_INFO);
+                } else { /* QSFP */
+                    tx_dis = onlp_sfpi_dev_readb(port, PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_TXDIS);
+                }
+                *value = tx_dis;
+                rv = ONLP_STATUS_OK;
+            } else {
+                rv = ONLP_STATUS_E_INTERNAL;
+            }
+        } else { /* SFP */
+            switch (port) {
+            case 10 ... 24:
+                path = MODULE_TXDISABLE_MAIN_BOARD_CPLD1_FORMAT;
+                break;
+            case 25 ... 49:
+                path = MODULE_TXDISABLE_MAIN_BOARD_CPLD2_FORMAT;
+                break;
+            case 50 ... 73:
+                path = MODULE_TXDISABLE_MAIN_BOARD_CPLD3_FORMAT;
+                break;
+            default:
+                break;
+            }
+            if (onlp_file_read_int(value, path, (port+1)) < 0) {
+                AIM_LOG_ERROR("Unable to read tx_disabled status from port(%d)\r\n", port);
+                rv = ONLP_STATUS_E_INTERNAL;
+            }
         }
         break;
     }
