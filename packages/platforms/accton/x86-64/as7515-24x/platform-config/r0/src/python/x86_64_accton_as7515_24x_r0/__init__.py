@@ -20,7 +20,6 @@ class OnlPlatform_x86_64_accton_as7515_24x_r0(OnlPlatformAccton,
 
     def baseconfig(self):
         self.modprobe('optoe')
-        self.modprobe('at24')
         self.modprobe('ym2651y')
 
         for m in [ 'fpga', 'cpld', 'fan', 'leds', 'mux', 'psu', 'sfp' ]:
