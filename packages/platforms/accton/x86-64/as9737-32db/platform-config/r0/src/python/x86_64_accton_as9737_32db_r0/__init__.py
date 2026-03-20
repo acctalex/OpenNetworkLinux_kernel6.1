@@ -108,8 +108,6 @@ class OnlPlatform_x86_64_accton_as9737_32db_r0(OnlPlatformAccton,
                 ('as9737_32db_cpld2', 0x61, 36),
                 ('as9737_32db_cpld3', 0x62, 37),
 
-                # EEPROM
-                #('24c02', 0x56, 0),
                 ]
             )
 
