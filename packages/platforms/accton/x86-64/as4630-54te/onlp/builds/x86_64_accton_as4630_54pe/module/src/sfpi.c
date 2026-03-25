@@ -288,7 +288,8 @@ onlp_sfpi_control_set(int port, onlp_sfp_control_t control, int value)
     int present = 0;
 
     switch(control) {
-    case ONLP_SFP_CONTROL_TX_DISABLE: {
+    case ONLP_SFP_CONTROL_TX_DISABLE: 
+    case ONLP_SFP_CONTROL_TX_DISABLE_CHANNEL: {
         VALIDATE(port);
         if (port >= 48 && port < 52)
         {
@@ -378,7 +379,8 @@ onlp_sfpi_control_get(int port, onlp_sfp_control_t control, int* value)
         return ONLP_STATUS_OK;
     }
 
-    case ONLP_SFP_CONTROL_TX_DISABLE: {
+    case ONLP_SFP_CONTROL_TX_DISABLE: 
+    case ONLP_SFP_CONTROL_TX_DISABLE_CHANNEL: {
         VALIDATE(port);
         if (port >= 48 && port < 52)
         {
