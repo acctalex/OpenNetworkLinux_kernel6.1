@@ -292,6 +292,7 @@ onlp_sfpi_control_set(int port, onlp_sfp_control_t control, int value)
     switch(control)
         {
         case ONLP_SFP_CONTROL_TX_DISABLE:
+        case ONLP_SFP_CONTROL_TX_DISABLE_CHANNEL:
             {
                 if(port >= 0 && port <= 31) {
                     present = onlp_sfpi_is_present(port);
@@ -343,7 +344,7 @@ onlp_sfpi_control_get(int port, onlp_sfp_control_t control, int* value)
         case ONLP_SFP_CONTROL_RX_LOS:
             {
                 if(port==32 || port==33) {
-            	    if (onlp_file_read_int(value, MODULE_RXLOS_FORMAT, bus, addr, (port+1)) < 0) {
+                    if (onlp_file_read_int(value, MODULE_RXLOS_FORMAT, bus, addr, (port+1)) < 0) {
                         AIM_LOG_ERROR("Unable to read rx_loss status from port(%d)\r\n", port);
                         rv = ONLP_STATUS_E_INTERNAL;
                     }
@@ -360,7 +361,7 @@ onlp_sfpi_control_get(int port, onlp_sfp_control_t control, int* value)
         case ONLP_SFP_CONTROL_TX_FAULT:
             {
                 if(port==32 || port==33) {
-            	    if (onlp_file_read_int(value, MODULE_TXFAULT_FORMAT, bus, addr, (port+1)) < 0) {
+                    if (onlp_file_read_int(value, MODULE_TXFAULT_FORMAT, bus, addr, (port+1)) < 0) {
                         AIM_LOG_ERROR("Unable to read tx_fault status from port(%d)\r\n", port);
                         rv = ONLP_STATUS_E_INTERNAL;
                     }
@@ -375,6 +376,7 @@ onlp_sfpi_control_get(int port, onlp_sfp_control_t control, int* value)
             }
 
         case ONLP_SFP_CONTROL_TX_DISABLE:
+        case ONLP_SFP_CONTROL_TX_DISABLE_CHANNEL:
             {
                 if(port >= 0 && port <= 31) {
                     present = onlp_sfpi_is_present(port);

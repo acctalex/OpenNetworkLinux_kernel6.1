@@ -274,6 +274,7 @@ onlp_sfpi_control_set(int port, onlp_sfp_control_t control, int value)
 
     switch(control) {
     case ONLP_SFP_CONTROL_TX_DISABLE:
+    case ONLP_SFP_CONTROL_TX_DISABLE_CHANNEL:
     {
         if(port >= 0 && port <= 25) {
             present = onlp_sfpi_is_present(port);
@@ -365,8 +366,8 @@ onlp_sfpi_control_get(int port, onlp_sfp_control_t control, int* value)
     int rv = ONLP_STATUS_OK;
     char *path = NULL;
     int present = 0;
-	int identifier = 0;
-	int tx_dis = 0;
+    int identifier = 0;
+    int tx_dis = 0;
 
     if (port < 0 || port >= 30) {
             return ONLP_STATUS_E_UNSUPPORTED;
@@ -397,6 +398,7 @@ onlp_sfpi_control_get(int port, onlp_sfp_control_t control, int* value)
         rv = ONLP_STATUS_E_UNSUPPORTED;
         break;
     case ONLP_SFP_CONTROL_TX_DISABLE:
+    case ONLP_SFP_CONTROL_TX_DISABLE_CHANNEL:
     {
         if (port >= 0 && port <= 25) {
             present = onlp_sfpi_is_present(port);

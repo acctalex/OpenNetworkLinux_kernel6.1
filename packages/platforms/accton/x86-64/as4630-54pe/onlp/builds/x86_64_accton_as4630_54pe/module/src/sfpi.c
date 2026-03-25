@@ -238,6 +238,7 @@ onlp_sfpi_control_set(int port, onlp_sfp_control_t control, int value)
     switch(control)
     {
         case ONLP_SFP_CONTROL_TX_DISABLE:
+        case ONLP_SFP_CONTROL_TX_DISABLE_CHANNEL:
         {
             if(port>=48 && port<=51) {
                 if (onlp_file_write_int(value, MODULE_TXDISABLE_FORMAT, bus, addr, (port+1)) < 0) {
@@ -334,6 +335,7 @@ onlp_sfpi_control_get(int port, onlp_sfp_control_t control, int* value)
         }
 
         case ONLP_SFP_CONTROL_TX_DISABLE:
+        case ONLP_SFP_CONTROL_TX_DISABLE_CHANNEL:
         {
             if(port>=48 && port<=51) {
                 if (onlp_file_read_int(value, MODULE_TXDISABLE_FORMAT, bus, addr, (port+1)) < 0) {
