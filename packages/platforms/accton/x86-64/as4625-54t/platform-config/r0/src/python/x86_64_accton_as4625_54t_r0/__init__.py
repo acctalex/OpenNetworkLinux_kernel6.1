@@ -15,7 +15,6 @@ class OnlPlatform_x86_64_accton_as4625_54t_r0(OnlPlatformAccton,
     SYS_OBJECT_ID=".4625.54.1"
 
     def baseconfig(self):
-        os.system("modprobe at24")
         self.insmod('optoe')
         self.insmod('ym2651y')
 
