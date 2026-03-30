@@ -342,6 +342,7 @@ int onlp_sfpi_control_set(int port, onlp_sfp_control_t control, int value)
 
 	switch(control) {
 	case ONLP_SFP_CONTROL_TX_DISABLE:
+	case ONLP_SFP_CONTROL_TX_DISABLE_CHANNEL:
 		if(port >= 0 && port <= 31) {
 
 			present = onlp_sfpi_is_present(port);
@@ -480,7 +481,8 @@ int onlp_sfpi_control_get(int port, onlp_sfp_control_t control, int* value)
 		}
 		break;
 
-	case ONLP_SFP_CONTROL_TX_DISABLE:	
+	case ONLP_SFP_CONTROL_TX_DISABLE:
+	case ONLP_SFP_CONTROL_TX_DISABLE_CHANNEL:
 		if (port >= 0 && port <= 31) {
 
 			present = onlp_sfpi_is_present(port);
@@ -491,7 +493,7 @@ int onlp_sfpi_control_get(int port, onlp_sfp_control_t control, int* value)
 					onlp_sfpi_dev_writeb(port, PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_BANK_SELECT, 0);
 					onlp_sfpi_dev_writeb(port, PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_PAGE_SELECT, QSFP_DD_PAGE_LANE_CTRL);
 					tx_dis = onlp_sfpi_dev_readb(port, PORT_EEPROM_DEVADDR, QSFP_DD_P10H_OFFSET_OUTPUT_DISABLE_TX);
-					
+
 					onlp_sfpi_dev_writeb(port, PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_PAGE_SELECT, QSFP_DD_PAGE_ADMIN_INFO);
 				} else { /* QSFP */
 					tx_dis = onlp_sfpi_dev_readb(port, PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_TXDIS);
