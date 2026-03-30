@@ -60,6 +60,7 @@
 #define FAN_NODE(node)	FAN_BOARD_PATH#node
 
 #define IDPROM_PATH "/sys/bus/i2c/devices/13-0056/eeprom"
+#define WARM_RESET_FORMAT "/sys/bus/i2c/devices/1-0060/reset_mac"
 
 enum onlp_thermal_id
 {
@@ -94,6 +95,11 @@ enum onlp_fan_dir {
         FAN_DIR_F2B,
         FAN_DIR_B2F,
         FAN_DIR_COUNT,
+};
+
+enum reset_dev_type {
+	WARM_RESET_MAC = 1,
+	WARM_RESET_MAX
 };
 
 enum onlp_fan_dir onlp_get_fan_dir(void);
