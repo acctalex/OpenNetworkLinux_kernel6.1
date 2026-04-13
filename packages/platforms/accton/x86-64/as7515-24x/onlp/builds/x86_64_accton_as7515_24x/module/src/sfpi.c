@@ -318,25 +318,25 @@ onlp_sfpi_control_set(int port, onlp_sfp_control_t control, int value)
     case ONLP_SFP_CONTROL_TX_DISABLE:
     case ONLP_SFP_CONTROL_TX_DISABLE_CHANNEL: {
         VALIDATE(port);
-        if(port >= 0 && port < 4) {
-            present = onlp_sfpi_is_present(port);
-            if(present == 1) {
+        present = onlp_sfpi_is_present(port);
+        if (present == 1) {
+            if (port >= 0 && port < 4) {
                 /* txdis valid bit(bit0-bit3), xxxx 1111 */
                 value = value&0xf;
 
                 onlp_sfpi_dev_writeb(port, PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_TXDIS, value);
 
                 return ONLP_STATUS_OK;
-
             } else {
-                return ONLP_STATUS_E_INTERNAL;
+                if (onlp_file_write_int(value, MODULE_TXDISABLE_FORMAT, port+1) < 0) {
+                    AIM_LOG_ERROR("Unable to set tx_disable status to port(%d)\r\n", port);
+                    return ONLP_STATUS_E_INTERNAL;
+                }
+                return ONLP_STATUS_OK;
             }
         } else {
-            if (onlp_file_write_int(value, MODULE_TXDISABLE_FORMAT, port+1) < 0) {
-                AIM_LOG_ERROR("Unable to set tx_disable status to port(%d)\r\n", port);
-                return ONLP_STATUS_E_INTERNAL;
-            }
-            return ONLP_STATUS_OK;
+            AIM_LOG_ERROR("No transceiver is present in port(%d)\r\n", port);
+            return ONLP_STATUS_E_INTERNAL;
         }
     }
     case ONLP_SFP_CONTROL_RESET_STATE: {
@@ -400,24 +400,24 @@ onlp_sfpi_control_get(int port, onlp_sfp_control_t control, int* value)
     case ONLP_SFP_CONTROL_TX_DISABLE:
     case ONLP_SFP_CONTROL_TX_DISABLE_CHANNEL: {
         VALIDATE(port);
-        if(port >= 0 && port < 4) {
-            present = onlp_sfpi_is_present(port);
-            if(present == 1) {
+        present = onlp_sfpi_is_present(port);
+        if (present == 1) {
+            if (port >= 0 && port < 4) {
                 tx_dis = onlp_sfpi_dev_readb(port, PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_TXDIS);
 
                 *value = tx_dis;
 
                 return ONLP_STATUS_OK;
-
             } else {
-                return ONLP_STATUS_E_INTERNAL;
+                if (onlp_file_read_int(value, MODULE_TXDISABLE_FORMAT, port+1) < 0) {
+                    AIM_LOG_ERROR("Unable to read tx_disabled status from port(%d)\r\n", port);
+                    return ONLP_STATUS_E_INTERNAL;
+                }
+                return ONLP_STATUS_OK;
             }
         } else {
-            if (onlp_file_read_int(value, MODULE_TXDISABLE_FORMAT, port+1) < 0) {
-                AIM_LOG_ERROR("Unable to read tx_disabled status from port(%d)\r\n", port);
-                return ONLP_STATUS_E_INTERNAL;
-            }
-            return ONLP_STATUS_OK;
+            AIM_LOG_ERROR("No transceiver is present in port(%d)\r\n", port);
+            return ONLP_STATUS_E_INTERNAL;
         }
     }
     case ONLP_SFP_CONTROL_RESET_STATE: {
