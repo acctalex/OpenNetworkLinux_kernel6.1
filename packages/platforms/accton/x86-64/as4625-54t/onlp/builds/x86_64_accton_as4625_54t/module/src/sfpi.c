@@ -42,10 +42,6 @@
 #define MODULE_TXDISABLE_FORMAT_1 "/sys/bus/i2c/devices/1-0064/module_tx_disable_%d"
 #define MODULE_PRESENT_ALL_ATTR_1 "/sys/bus/i2c/devices/1-0064/module_present_all"
 #define MODULE_RXLOS_ALL_ATTR_1   "/sys/bus/i2c/devices/1-0064/module_rx_los_all"
-/* QSFP device address of eeprom */
-#define PORT_EEPROM_DEVADDR             0x50
-/* QSFP tx disable offset */
-#define QSFP_EEPROM_OFFSET_TXDIS        0x56
 
 int port_bus_index[] = { 10, 11, 12, 13, 14, 15 };
 #define PORT_BUS_INDEX(port) (port_bus_index[port-48])
@@ -253,8 +249,8 @@ onlp_sfpi_dom_read(int port, uint8_t data[256])
 	FILE* fp;
 	char file[64] = {0};
 
-	if(port < 48)
-		return ONLP_STATUS_E_UNSUPPORTED;
+	VALIDATE_SFP(port);
+
 	sprintf(file, PORT_EEPROM_FORMAT, PORT_BUS_INDEX(port));
 	fp = fopen(file, "r");
 	if(fp == NULL) {
@@ -284,9 +280,14 @@ onlp_sfpi_dom_read(int port, uint8_t data[256])
 int
 onlp_sfpi_control_set(int port, onlp_sfp_control_t control, int value)
 {
+	int present = 0;
+
 	switch(control) {
-	case ONLP_SFP_CONTROL_TX_DISABLE:{
-		if (port >= 48 && port <= 53) {
+	case ONLP_SFP_CONTROL_TX_DISABLE:
+	case ONLP_SFP_CONTROL_TX_DISABLE_CHANNEL: {
+		VALIDATE_SFP(port);
+		present = onlp_sfpi_is_present(port);
+		if (present == 1) {
 			if (onlp_file_write_int(value, MODULE_TXDISABLE_FORMAT_0
 				, (port+1)) < 0) {
 				if (onlp_file_write_int(value, MODULE_TXDISABLE_FORMAT_1
@@ -299,10 +300,9 @@ onlp_sfpi_control_set(int port, onlp_sfp_control_t control, int value)
 
 			return ONLP_STATUS_OK;
 		} else {
+			AIM_LOG_ERROR("No transceiver is present in port(%d)\r\n", port);
 			return ONLP_STATUS_E_INTERNAL;
 		}
-
-		return ONLP_STATUS_E_INTERNAL;
 	}
 
 	default:
@@ -315,6 +315,9 @@ onlp_sfpi_control_set(int port, onlp_sfp_control_t control, int value)
 int
 onlp_sfpi_control_get(int port, onlp_sfp_control_t control, int* value)
 {
+
+	int present = 0;
+	*value = 0;
 
 	switch(control) {
 	case ONLP_SFP_CONTROL_RX_LOS: {
@@ -347,9 +350,11 @@ onlp_sfpi_control_get(int port, onlp_sfp_control_t control, int* value)
 		return ONLP_STATUS_OK;
 	}
 
-	case ONLP_SFP_CONTROL_TX_DISABLE: {
-		if (port >= 48 && port <= 53)
-		{
+	case ONLP_SFP_CONTROL_TX_DISABLE: 
+	case ONLP_SFP_CONTROL_TX_DISABLE_CHANNEL: {
+		VALIDATE_SFP(port);
+		present = onlp_sfpi_is_present(port);
+		if (present == 1) {
 			if (onlp_file_read_int(value, MODULE_TXDISABLE_FORMAT_0, 
 				(port+1)) < 0) {
 				if (onlp_file_read_int(value, MODULE_TXDISABLE_FORMAT_1, 
@@ -362,11 +367,9 @@ onlp_sfpi_control_get(int port, onlp_sfp_control_t control, int* value)
 
 			return ONLP_STATUS_OK;
 		} else {
+			AIM_LOG_ERROR("No transceiver is present in port(%d)\r\n", port);
 			return ONLP_STATUS_E_INTERNAL;
 		}
-
-
-		return ONLP_STATUS_E_INTERNAL;
 	}
 	default:
 		break;
