@@ -327,81 +327,78 @@ onlp_sfpi_control_set(int port, onlp_sfp_control_t control, int value)
     case ONLP_SFP_CONTROL_TX_DISABLE:
     case ONLP_SFP_CONTROL_TX_DISABLE_CHANNEL: {
         VALIDATE(port);
+        present = onlp_sfpi_is_present(port);
 
-        if ((present = onlp_sfpi_is_present(port)) != 1) {
-            if (present == 0) {
-                AIM_LOG_ERROR("No transceiver is in port(%d)\r\n", port);
-            }
-            AIM_LOG_ERROR("Unable to write tx_disable status to port(%d)\r\n", port);
-            return ONLP_STATUS_E_INTERNAL;
-        }
-
-        if (port >= 0 && port <= 3) {
-            if ((identifier = onlp_sfpi_dev_readb(port, XCVR_PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_IDENTIFIER)) < 0 ) {
-                AIM_LOG_ERROR("Failed to read Identifier, unable to write tx_disable status to port(%d)\r\n", port);
-                return ONLP_STATUS_E_INTERNAL;
-            }
-
-            if (identifier == QSFP_DD_IDENTIFIER) {
-                if ((rv = onlp_sfpi_dev_writeb(port, XCVR_PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_BANK_SELECT, 0)) < 0) {
-                    AIM_LOG_ERROR("Failed to set Bank 0, unable to write tx_disable status to port(%d)\r\n", port);
+        if (present == 1) {
+            if (port >= 0 && port <= 3) {
+                if ((identifier = onlp_sfpi_dev_readb(port, XCVR_PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_IDENTIFIER)) < 0 ) {
+                    AIM_LOG_ERROR("Failed to read Identifier, unable to write tx_disable status to port(%d)\r\n", port);
                     return ONLP_STATUS_E_INTERNAL;
                 }
-                if ((rv = onlp_sfpi_dev_writeb(port, XCVR_PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_PAGE_SELECT, QSFP_DD_PAGE_ADVERTISING)) < 0) {
-                    AIM_LOG_ERROR("Failed to switch to Advertising Page on port(%d)\r\n", port);
-                    goto restore;
-                }
-                if ((support_ctrls = onlp_sfpi_dev_readb(port, XCVR_PORT_EEPROM_DEVADDR, QSFP_DD_P01H_OFFSET_CONTROL_1)) < 0 ) {
-                    AIM_LOG_ERROR("Failed to read Support Control on port(%d)\r\n", port);
-                    rv = support_ctrls;
-                    goto restore;
-                }
-                if (support_ctrls & QSFP_DD_P01H_TX_DISABLE_SUPPORT) {
+
+                if (identifier == QSFP_DD_IDENTIFIER) {
                     if ((rv = onlp_sfpi_dev_writeb(port, XCVR_PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_BANK_SELECT, 0)) < 0) {
-                        AIM_LOG_ERROR("Failed to set Bank 0 on port(%d)\r\n", port);
+                        AIM_LOG_ERROR("Failed to set Bank 0, unable to write tx_disable status to port(%d)\r\n", port);
+                        return ONLP_STATUS_E_INTERNAL;
+                    }
+                    if ((rv = onlp_sfpi_dev_writeb(port, XCVR_PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_PAGE_SELECT, QSFP_DD_PAGE_ADVERTISING)) < 0) {
+                        AIM_LOG_ERROR("Failed to switch to Advertising Page on port(%d)\r\n", port);
                         goto restore;
                     }
-                    if ((rv = onlp_sfpi_dev_writeb(port, XCVR_PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_PAGE_SELECT, QSFP_DD_PAGE_LANE_CTRL)) < 0 ) {
-                        AIM_LOG_ERROR("Failed to switch to Lane Control Page (Page 0x%02x) on port(%d)\r\n", 
-                                       QSFP_DD_PAGE_LANE_CTRL, port);
+                    if ((support_ctrls = onlp_sfpi_dev_readb(port, XCVR_PORT_EEPROM_DEVADDR, QSFP_DD_P01H_OFFSET_CONTROL_1)) < 0 ) {
+                        AIM_LOG_ERROR("Failed to read Support Control on port(%d)\r\n", port);
+                        rv = support_ctrls;
                         goto restore;
                     }
-                    if ((rv = onlp_sfpi_dev_writeb(port, XCVR_PORT_EEPROM_DEVADDR, QSFP_DD_P10H_OFFSET_OUTPUT_DISABLE_TX, (value & 0xff))) < 0) {
-                        AIM_LOG_ERROR("Failed to write tx_disable value(0x%02x) to Lane Control register on port(%d)\r\n", value, port);
+                    if (support_ctrls & QSFP_DD_P01H_TX_DISABLE_SUPPORT) {
+                        if ((rv = onlp_sfpi_dev_writeb(port, XCVR_PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_BANK_SELECT, 0)) < 0) {
+                            AIM_LOG_ERROR("Failed to set Bank 0 on port(%d)\r\n", port);
+                            goto restore;
+                        }
+                        if ((rv = onlp_sfpi_dev_writeb(port, XCVR_PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_PAGE_SELECT, QSFP_DD_PAGE_LANE_CTRL)) < 0 ) {
+                            AIM_LOG_ERROR("Failed to switch to Lane Control Page (Page 0x%02x) on port(%d)\r\n", 
+                                        QSFP_DD_PAGE_LANE_CTRL, port);
+                            goto restore;
+                        }
+                        if ((rv = onlp_sfpi_dev_writeb(port, XCVR_PORT_EEPROM_DEVADDR, QSFP_DD_P10H_OFFSET_OUTPUT_DISABLE_TX, (value & 0xff))) < 0) {
+                            AIM_LOG_ERROR("Failed to write tx_disable value(0x%02x) to Lane Control register on port(%d)\r\n", value, port);
+                            goto restore;
+                        }
+                    } else {
+                        AIM_LOG_ERROR("Setting tx_disable to port(%d) is not supported\r\n", port);
+                        rv = ONLP_STATUS_E_UNSUPPORTED;
                         goto restore;
                     }
-                } else {
-                    AIM_LOG_ERROR("Setting tx_disable to port(%d) is not supported\r\n", port);
-                    rv = ONLP_STATUS_E_UNSUPPORTED;
-                    goto restore;
-                }
 
-            restore:
-                if ((onlp_sfpi_dev_writeb(port, XCVR_PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_PAGE_SELECT,
-                                                         QSFP_DD_PAGE_ADMIN_INFO)) < 0) {
-                    AIM_LOG_ERROR("Failed to restore Page Select to Admin Info on port(%d)!\r\n", port);
-                }
-                if (rv < 0) {
-                    AIM_LOG_ERROR("Unable to write tx_disable status to port(%d)\r\n", port);
-                    return (rv == ONLP_STATUS_E_UNSUPPORTED) ? rv : ONLP_STATUS_E_INTERNAL;
-                }
+                restore:
+                    if ((onlp_sfpi_dev_writeb(port, XCVR_PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_PAGE_SELECT,
+                                                            QSFP_DD_PAGE_ADMIN_INFO)) < 0) {
+                        AIM_LOG_ERROR("Failed to restore Page Select to Admin Info on port(%d)!\r\n", port);
+                    }
+                    if (rv < 0) {
+                        AIM_LOG_ERROR("Unable to write tx_disable status to port(%d)\r\n", port);
+                        return (rv == ONLP_STATUS_E_UNSUPPORTED) ? rv : ONLP_STATUS_E_INTERNAL;
+                    }
 
-                return ONLP_STATUS_OK;
+                    return ONLP_STATUS_OK;
 
-            } else { /* QSFP */
-                /* txdis valid bit(bit0-bit3), xxxx 1111 */
-                if (onlp_sfpi_dev_writeb(port, XCVR_PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_TXDIS, (value & 0xf)) < 0) {
+                } else { /* QSFP */
+                    /* txdis valid bit(bit0-bit3), xxxx 1111 */
+                    if (onlp_sfpi_dev_writeb(port, XCVR_PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_TXDIS, (value & 0xf)) < 0) {
+                        AIM_LOG_ERROR("Unable to write tx_disable status to port(%d)\r\n", port);
+                        return ONLP_STATUS_E_INTERNAL;
+                    }
+                    return ONLP_STATUS_OK;
+                }
+            } else {
+                if (onlp_file_write_int(value, MODULE_TXDISABLE_FORMAT, (port+1)) < 0) {
                     AIM_LOG_ERROR("Unable to write tx_disable status to port(%d)\r\n", port);
                     return ONLP_STATUS_E_INTERNAL;
                 }
                 return ONLP_STATUS_OK;
             }
         } else {
-            if (onlp_file_write_int(value, MODULE_TXDISABLE_FORMAT, (port+1)) < 0) {
-                AIM_LOG_ERROR("Unable to write tx_disable status to port(%d)\r\n", port);
-                return ONLP_STATUS_E_INTERNAL;
-            }
-            return ONLP_STATUS_OK;
+            return ONLP_STATUS_E_INTERNAL;
         }
     }
     case ONLP_SFP_CONTROL_RESET: {
@@ -503,65 +500,61 @@ onlp_sfpi_control_get(int port, onlp_sfp_control_t control, int* value)
     case ONLP_SFP_CONTROL_TX_DISABLE:
     case ONLP_SFP_CONTROL_TX_DISABLE_CHANNEL: {
         VALIDATE(port);
+        present = onlp_sfpi_is_present(port);
 
-        if ((present = onlp_sfpi_is_present(port)) != 1) {
-            if (present == 0) {
-                AIM_LOG_ERROR("No transceiver is in port(%d)\r\n", port);
+        if (present == 1) {
+            if (port >= 0 && port <= 3) {
+                if ((identifier = onlp_sfpi_dev_readb(port, XCVR_PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_IDENTIFIER)) < 0) {
+                    AIM_LOG_ERROR("Failed to read Identifier, unable to read tx_disable status from port(%d)\r\n", port);
+                    return ONLP_STATUS_E_INTERNAL;
+                }
+
+                if (identifier == QSFP_DD_IDENTIFIER) {
+                    if ((rv = onlp_sfpi_dev_writeb(port, XCVR_PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_BANK_SELECT, 0)) < 0) {
+                        AIM_LOG_ERROR("Failed to set Bank 0, unable to read tx_disable status from port(%d)\r\n", port);
+                        return ONLP_STATUS_E_INTERNAL;
+                    }
+                    if ((rv = onlp_sfpi_dev_writeb(port, XCVR_PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_PAGE_SELECT, QSFP_DD_PAGE_LANE_CTRL)) < 0) {
+                        AIM_LOG_ERROR("Failed to switch to Lane Control Page (Page 0x%02x) on port(%d)\r\n", 
+                                    QSFP_DD_PAGE_LANE_CTRL, port);
+                        goto restore;
+                    }
+                    if ((tx_dis = onlp_sfpi_dev_readb(port, XCVR_PORT_EEPROM_DEVADDR, QSFP_DD_P10H_OFFSET_OUTPUT_DISABLE_TX)) < 0) {
+                        AIM_LOG_ERROR("Failed to read TX_DISABLE value from Lane Control register on port(%d)\r\n", port);
+                        rv = tx_dis;
+                        goto restore;
+                    }
+
+                restore:
+                    if ((onlp_sfpi_dev_writeb(port, XCVR_PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_PAGE_SELECT,
+                                                            QSFP_DD_PAGE_ADMIN_INFO)) < 0) {
+                        AIM_LOG_ERROR("Failed to restore Page Select to Admin Info on port(%d)!\r\n", port);
+                    }
+
+                    if (rv < 0) {
+                        AIM_LOG_ERROR("Unable to get tx_disable status from port(%d)\r\n", port);
+                        return ONLP_STATUS_E_INTERNAL;
+                    }
+                    *value = (tx_dis & 0xff);
+                    return ONLP_STATUS_OK;
+                } else { /* QSFP */
+                    if ((tx_dis = onlp_sfpi_dev_readb(port, XCVR_PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_TXDIS)) < 0) {
+                        AIM_LOG_ERROR("Unable to read tx_disable status from port(%d)\r\n", port);
+                        return ONLP_STATUS_E_INTERNAL;
+                    }
+                    *value = (tx_dis & 0xf);
+                    return ONLP_STATUS_OK;
+                }
+            } else { /* SFP */
+                if (onlp_file_read_int(value, MODULE_TXDISABLE_FORMAT, (port+1)) < 0) {
+                        AIM_LOG_ERROR("Unable to read tx_disable status from port(%d)\r\n", port);
+                        return ONLP_STATUS_E_INTERNAL;
+                }
+                return ONLP_STATUS_OK;
             }
-            AIM_LOG_ERROR("Unable to read tx_disable status from port(%d)\r\n", port);
+        } else {
             return ONLP_STATUS_E_INTERNAL;
         }
-
-        if (port >= 0 && port <= 3) {
-            if ((identifier = onlp_sfpi_dev_readb(port, XCVR_PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_IDENTIFIER)) < 0) {
-                AIM_LOG_ERROR("Failed to read Identifier, unable to read tx_disable status from port(%d)\r\n", port);
-                return ONLP_STATUS_E_INTERNAL;
-            }
-
-            if (identifier == QSFP_DD_IDENTIFIER) {
-                if ((rv = onlp_sfpi_dev_writeb(port, XCVR_PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_BANK_SELECT, 0)) < 0) {
-                    AIM_LOG_ERROR("Failed to set Bank 0, unable to read tx_disable status from port(%d)\r\n", port);
-                    return ONLP_STATUS_E_INTERNAL;
-                }
-                if ((rv = onlp_sfpi_dev_writeb(port, XCVR_PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_PAGE_SELECT, QSFP_DD_PAGE_LANE_CTRL)) < 0) {
-                    AIM_LOG_ERROR("Failed to switch to Lane Control Page (Page 0x%02x) on port(%d)\r\n", 
-                                   QSFP_DD_PAGE_LANE_CTRL, port);
-                    goto restore;
-                }
-                if ((tx_dis = onlp_sfpi_dev_readb(port, XCVR_PORT_EEPROM_DEVADDR, QSFP_DD_P10H_OFFSET_OUTPUT_DISABLE_TX)) < 0) {
-                    AIM_LOG_ERROR("Failed to read TX_DISABLE value from Lane Control register on port(%d)\r\n", port);
-                    rv = tx_dis;
-                    goto restore;
-                }
-
-            restore:
-                if ((onlp_sfpi_dev_writeb(port, XCVR_PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_PAGE_SELECT,
-                                                         QSFP_DD_PAGE_ADMIN_INFO)) < 0) {
-                    AIM_LOG_ERROR("Failed to restore Page Select to Admin Info on port(%d)!\r\n", port);
-                }
-
-                if (rv < 0) {
-                    AIM_LOG_ERROR("Unable to get tx_disable status from port(%d)\r\n", port);
-                    return ONLP_STATUS_E_INTERNAL;
-                }
-                *value = (tx_dis & 0xff);
-                return ONLP_STATUS_OK;
-            } else { /* QSFP */
-                if ((tx_dis = onlp_sfpi_dev_readb(port, XCVR_PORT_EEPROM_DEVADDR, QSFP_EEPROM_OFFSET_TXDIS)) < 0) {
-                    AIM_LOG_ERROR("Unable to read tx_disable status from port(%d)\r\n", port);
-                    return ONLP_STATUS_E_INTERNAL;
-                }
-                *value = (tx_dis & 0xf);
-                return ONLP_STATUS_OK;
-            }
-        } else { /* SFP */
-            if (onlp_file_read_int(value, MODULE_TXDISABLE_FORMAT, (port+1)) < 0) {
-                    AIM_LOG_ERROR("Unable to read tx_disable status from port(%d)\r\n", port);
-                    return ONLP_STATUS_E_INTERNAL;
-            }
-            return ONLP_STATUS_OK;
-        } 
-
     }
     case ONLP_SFP_CONTROL_RESET: {
         VALIDATE_QSFP(port);
