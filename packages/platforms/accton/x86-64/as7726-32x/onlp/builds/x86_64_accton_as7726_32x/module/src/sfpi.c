@@ -42,12 +42,6 @@
             return ONLP_STATUS_E_UNSUPPORTED; \
     } while(0)
 
-#define VALIDATE_QSFP(_port) \
-    do { \
-        if (_port < 0 || _port > 31 ) \
-            return ONLP_STATUS_E_UNSUPPORTED; \
-    } while(0)
-
 #define PORT_EEPROM_FORMAT              "/sys/bus/i2c/devices/%d-0050/eeprom"
 #define MODULE_PRESENT_FORMAT		    "/sys/bus/i2c/devices/%d-00%d/module_present_%d"
 #define MODULE_RXLOS_FORMAT             "/sys/bus/i2c/devices/%d-00%d/module_rx_los_%d"
