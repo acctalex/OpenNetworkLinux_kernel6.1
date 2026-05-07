@@ -50,13 +50,13 @@
 
 #define VALIDATE(_port) \
     do { \
-        if (_port < 0 || _port > 73) \
+        if (_port < 0 || _port > (NUM_OF_SFP_PORT-1)) \
             return ONLP_STATUS_E_INVALID; \
     } while(0)
 
 #define VALIDATE_SFP(_port) \
     do { \
-        if (_port < 10 || _port > 73) \
+        if (_port < 10 || _port > (NUM_OF_SFP_PORT-1)) \
             return ONLP_STATUS_E_UNSUPPORTED; \
     } while(0)
 
