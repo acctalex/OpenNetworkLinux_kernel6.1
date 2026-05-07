@@ -42,12 +42,6 @@
             return ONLP_STATUS_E_UNSUPPORTED; \
     } while(0)
 
-#define VALIDATE_QSFP(_port) \
-    do { \
-        if (_port < 48 || _port > 55) \
-            return ONLP_STATUS_E_UNSUPPORTED; \
-    } while(0)
-
 #define PORT_BUS_INDEX(port) sfp_map[port]
 
 #define PORT_EEPROM_FORMAT              "/sys/bus/i2c/devices/%d-0050/eeprom"
@@ -379,9 +373,7 @@ onlp_sfpi_control_get(int port, onlp_sfp_control_t control, int* value)
         {
         case ONLP_SFP_CONTROL_RX_LOS:
             {
-                if (port < 0 || port >= 48) {
-                    return ONLP_STATUS_E_UNSUPPORTED;
-                }
+                VALIDATE_SFP(port);
 
                 if (onlp_file_read_int(value, MODULE_RXLOS_FORMAT, bus, addr, (port+1)) < 0) {
                     AIM_LOG_ERROR("Unable to read rx_loss status from port(%d)\r\n", port);
@@ -395,9 +387,7 @@ onlp_sfpi_control_get(int port, onlp_sfp_control_t control, int* value)
 
         case ONLP_SFP_CONTROL_TX_FAULT:
             {
-                if (port < 0 || port >= 48) {
-                    return ONLP_STATUS_E_UNSUPPORTED;
-                }
+                VALIDATE_SFP(port);
 
                 if (onlp_file_read_int(value, MODULE_TXFAULT_FORMAT, bus, addr, (port+1)) < 0) {
                     AIM_LOG_ERROR("Unable to read tx_fault status from port(%d)\r\n", port);
