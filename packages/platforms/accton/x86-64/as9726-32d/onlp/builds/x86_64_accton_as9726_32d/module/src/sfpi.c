@@ -441,14 +441,9 @@ int onlp_sfpi_control_set(int port, onlp_sfp_control_t control, int value)
 		break;
 
 	case ONLP_SFP_CONTROL_RESET:
-		if (port >= 0 && port < 16) {
-			addr = 61;
-		} else if(port >= 16 && port < 32) {
-			addr = 62;
-		} else {
-			rv = ONLP_STATUS_E_UNSUPPORTED;
-			break;
-		}
+
+		VALIDATE_QSFP(port);
+		addr = (port < 16) ? 61 : 62;
 
 		if (onlp_file_write_int(value, MODULE_RESET_FORMAT,
 					bus, addr, (port + 1)) < 0) {
@@ -461,14 +456,9 @@ int onlp_sfpi_control_set(int port, onlp_sfp_control_t control, int value)
 		break;
 
 	case ONLP_SFP_CONTROL_LP_MODE:
-		if (port >= 0 && port < 16) {
-			addr = 61;
-		} else if(port >= 16 && port < 32) {
-			addr = 62;
-		} else {
-			rv = ONLP_STATUS_E_UNSUPPORTED;
-			break;
-		}
+
+		VALIDATE_QSFP(port);
+		addr = (port < 16) ? 61 : 62;
 
 		if (onlp_file_write_int(value, MODULE_LPMODE_FORMAT,
 					bus, addr, (port + 1)) < 0) {
@@ -501,34 +491,32 @@ int onlp_sfpi_control_get(int port, onlp_sfp_control_t control, int* value)
 
 	switch (control) {
 	case ONLP_SFP_CONTROL_RX_LOS:
-		if (port == 32 || port == 33) {
-			addr = 62;
-			if (onlp_file_read_int(value, MODULE_RXLOS_FORMAT, 
-					       bus, addr, (port+1)) < 0) {
-				AIM_LOG_ERROR("Unable to read rx_loss status from port(%d)\r\n",
-					      port);
-				rv = ONLP_STATUS_E_INTERNAL;
-			} else {
-				rv = ONLP_STATUS_OK;
-			}
+
+		VALIDATE_SFP(port);
+		addr = 62;
+
+		if (onlp_file_read_int(value, MODULE_RXLOS_FORMAT, 
+				       bus, addr, (port+1)) < 0) {
+			AIM_LOG_ERROR("Unable to read rx_loss status from port(%d)\r\n",
+				      port);
+			rv = ONLP_STATUS_E_INTERNAL;
 		} else {
-			rv = ONLP_STATUS_E_UNSUPPORTED;
+			rv = ONLP_STATUS_OK;
 		}
 		break;
 
 	case ONLP_SFP_CONTROL_TX_FAULT:
-		if (port == 32 || port == 33) {
-			addr = 62;
-			if (onlp_file_read_int(value, MODULE_TXFAULT_FORMAT,
-					       bus, addr, (port+1)) < 0) {
-				AIM_LOG_ERROR("Unable to read tx_fault status from port(%d)\r\n",
-					      port);
-				rv = ONLP_STATUS_E_INTERNAL;
-			} else {
-				rv = ONLP_STATUS_OK;
-			}
+
+		VALIDATE_SFP(port);
+		addr = 62;
+
+		if (onlp_file_read_int(value, MODULE_TXFAULT_FORMAT,
+						bus, addr, (port+1)) < 0) {
+			AIM_LOG_ERROR("Unable to read tx_fault status from port(%d)\r\n",
+						port);
+			rv = ONLP_STATUS_E_INTERNAL;
 		} else {
-			rv = ONLP_STATUS_E_UNSUPPORTED;
+			rv = ONLP_STATUS_OK;
 		}
 		break;
 
@@ -598,14 +586,9 @@ int onlp_sfpi_control_get(int port, onlp_sfp_control_t control, int* value)
 		break;
 
 	case ONLP_SFP_CONTROL_RESET:
-		if (port >= 0 && port < 16) {
-			addr = 61;
-		} else if(port >= 16 && port < 32) {
-			addr = 62;
-		} else {
-			rv = ONLP_STATUS_E_UNSUPPORTED;
-			break;
-		}
+
+		VALIDATE_QSFP(port);
+		addr = (port < 16) ? 61 : 62;
 
 		if (onlp_file_read_int(value, MODULE_RESET_FORMAT,
 					bus, addr, (port + 1)) < 0) {
@@ -618,14 +601,9 @@ int onlp_sfpi_control_get(int port, onlp_sfp_control_t control, int* value)
 		break;	
 
 	case ONLP_SFP_CONTROL_LP_MODE:
-		if (port >= 0 && port < 16) {
-			addr = 61;
-		} else if(port >= 16 && port < 32) {
-			addr = 62;
-		} else {
-			rv = ONLP_STATUS_E_UNSUPPORTED;
-			break;
-		}
+
+		VALIDATE_QSFP(port);
+		addr = (port < 16) ? 61 : 62;
 
 		if (onlp_file_read_int(value, MODULE_LPMODE_FORMAT,
 					bus, addr, (port + 1)) < 0) {
