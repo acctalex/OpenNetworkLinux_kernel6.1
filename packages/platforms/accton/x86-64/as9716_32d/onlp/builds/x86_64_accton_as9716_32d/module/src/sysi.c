@@ -37,7 +37,6 @@
 #include "x86_64_accton_as9716_32d_int.h"
 #include "x86_64_accton_as9716_32d_log.h"
 
-#define BIOS_VER_PATH "/sys/devices/virtual/dmi/id/bios_version"
 #define NUM_OF_FAN_ON_MAIN_BROAD      6
 #define PREFIX_PATH_ON_CPLD_DEV          "/sys/bus/i2c/devices/"
 #define NUM_OF_CPLD                   5
@@ -62,9 +61,9 @@ onlp_sysi_platform_get(void)
 
 int
 onlp_sysi_onie_data_get(uint8_t** data, int* size)
-{    
+{
     uint8_t* rdata = aim_zmalloc(256);
-		
+
     /*New board eeprom i2c-addr is 0x57. Old board's eeprom i2c-addr is 0x56*/		
     if(onlp_file_read(rdata, 256, size, IDPROM_PATH_1) == ONLP_STATUS_OK) /*0x57*/
     {
@@ -130,9 +129,10 @@ onlp_sysi_platform_info_get(onlp_platform_info_t* pi)
     int   rv;
     onlp_onie_info_t onie;
     char *bios_ver = NULL;
+    char *mfu_ver = NULL;
+    const char *bios = "";
+    const char *mfu = "";
     char *paths[] = {IDPROM_PATH_2, IDPROM_PATH_1};
-
-    onlp_file_read_str(&bios_ver, BIOS_VER_PATH);
 
     for (i = 0 ; i < AIM_ARRAYSIZE(paths); i++ ){
         rv = onlp_onie_decode_file(&onie, paths[i]);
@@ -140,7 +140,7 @@ onlp_sysi_platform_info_get(onlp_platform_info_t* pi)
         if(rv >= 0)
             break;
     }
-	
+
     for (i = 0; i < NUM_OF_CPLD; i++) {
         v[i] = 0;
 
@@ -154,12 +154,21 @@ onlp_sysi_platform_info_get(onlp_platform_info_t* pi)
                                     "\r\n\t   Main CPLD 3(0x62): %02X\r\n",
                                     v[0], v[1], v[2], v[3], v[4]);
 
-    pi->other_versions = aim_fstrdup("\r\n\t   BIOS: %s\r\n\t   ONIE: %s",
-                                    bios_ver, onie.onie_version);
+    if (onlp_file_read_str(&bios_ver, BIOS_VER_PATH) > 0) {
+        bios = bios_ver;
+    }
+    if (onlp_file_read_str(&mfu_ver, MFU_VER_PATH) > 0) {
+        mfu = mfu_ver;
+    }
+
+    pi->other_versions = aim_fstrdup("\r\n\t   BIOS: %s\r\n\t   ONIE: %s"
+                                     "\r\n\t   MFU: %s",
+                                    bios, onie.onie_version, mfu);
 
     onlp_onie_info_free(&onie);
     AIM_FREE_IF_PTR(bios_ver);
-	
+    AIM_FREE_IF_PTR(mfu_ver);
+
     return 0;
 }
 
@@ -170,8 +179,8 @@ onlp_sysi_platform_info_free(onlp_platform_info_t* pi)
     aim_free(pi->other_versions);
 }
 
-/*Read fanN_direction=1: The air flow of Fan6 is ¡§AFI-Back to Front¡¨
- *                    0: The air flow of Fan6 is ¡§AFO-Front to back¡¨
+/*Read fanN_direction=1: The air flow of Fan6 is ï¿½ï¿½AFI-Back to Frontï¿½ï¿½
+ *                    0: The air flow of Fan6 is ï¿½ï¿½AFO-Front to backï¿½ï¿½
  */
 /*
  Thermal policy:
@@ -328,7 +337,7 @@ typedef struct fan_ctrl_policy {
    int pwm;
    int state;
 } fan_ctrl_policy_t;
-   
+
 /*For AFI. 2 state. LEVEL_FAN_MID(75%), LEVEL_FAN_MAX(100%)
   For AFO. 3 state. LEVEL_FAN_MIN(50%), LEVEL_FAN_MID(75%), LEVEL_FAN_MAX(100%)
  */
@@ -348,14 +357,14 @@ fan_ctrl_policy_t  fan_thermal_policy_f2b[] = { /*AFO*/
 {50,  0x7, LEVEL_FAN_MIN},
 {75,  0xb, LEVEL_FAN_MID},
 {100, 0xf, LEVEL_FAN_MAX},
-    
+
 };
 
 fan_ctrl_policy_t  fan_thermal_policy_b2f[] = { /*AFI*/
 {75,  0xb, LEVEL_FAN_MID},
 {100, 0xf, LEVEL_FAN_MAX}
 };
-    
+
 void onlp_sysi_shutdown(void)
 {
     char cmd_str[64];
@@ -363,7 +372,7 @@ void onlp_sysi_shutdown(void)
     snprintf(cmd_str, 63, "i2cset -y -f 19 0x60 0x60 0x10");
     system(cmd_str); 
 }
-    
+
 int onlp_sysi_get_duty_cycle_by_fan_state(int state, int direction)
 {
     int i;
@@ -387,9 +396,8 @@ int onlp_sysi_get_duty_cycle_by_fan_state(int state, int direction)
             }
         }
     }
-    return 0;     
-   
-}    
+    return 0;
+}
 /*
  * If only one PSU insert , and watt >800w. Must let DUT fan pwm >= 75% in AFO.
  *  Because the psu temp is high.
@@ -405,7 +413,7 @@ int onlp_sysi_check_psu_loading(void)
     int psu_p_out[2]={0, 0};
     int id=1;
     int check_psu_watt=0;
-    
+
     for (id=1; id<=2; id++)
     {
         if (psu_status_info_get(id, "psu_power_good", &psu_power_good[id-1]) != 0) {
@@ -442,8 +450,7 @@ int onlp_sysi_check_psu_loading(void)
     }
     else
         return 0;
-    
-    
+
     return 0;
     
 }
@@ -451,7 +458,7 @@ int onlp_sysi_check_psu_loading(void)
 #define FAN_SPEED_CTRL_PATH "/sys/bus/i2c/devices/17-0066/fan_duty_cycle_percentage"
 #define FAN_DIRECTION_PATH "/sys/bus/i2c/devices/17-0066/fan1_direction"
 #define CHECK_TIMES 3
-    
+
 static int fan_state=LEVEL_FAN_INIT;
 static int fan_fail = 0;
 
@@ -470,13 +477,13 @@ int onlp_sysi_platform_manage_fans(void)
     int psu_full_load=0;
     onlp_thermal_info_t thermal[8];
     char  buf[10] = {0};
-    
+
     /* Get fan direction
      */
     if (onlp_file_read_int(&direction_val, FAN_DIRECTION_PATH) < 0) {
         AIM_LOG_ERROR("Unable to read status from file (%s)\r\n", FAN_DIRECTION_PATH); 
     }
-    
+
     if(fan_state==LEVEL_FAN_INIT)
     {
         fan_state=LEVEL_FAN_MAX; /*This is default state*/
@@ -488,7 +495,7 @@ int onlp_sysi_platform_manage_fans(void)
         return ONLP_STATUS_OK;    
     else
         count_check=0;
-        
+
     /* Get current temperature
      */
     for (i=2; i <5; i++)
@@ -500,7 +507,7 @@ int onlp_sysi_platform_manage_fans(void)
             return ONLP_STATUS_E_INTERNAL;
        }
         k++; 
-    }    
+    }
     for (i=6; i <=8; i++)
     {
         if (onlp_thermali_info_get(ONLP_THERMAL_ID_CREATE(i), &thermal[k]) != ONLP_STATUS_OK  )
@@ -559,7 +566,7 @@ int onlp_sysi_platform_manage_fans(void)
                 if (thermal[i].mcelsius <= afi_thermal_spec.max_to_mid_temp[i])
                 {
                     max_to_mid++;
-                }            
+                }
             }
         }
         if(max_to_mid==CHASSIS_THERMAL_COUNT && fan_state==LEVEL_FAN_MAX)
@@ -602,7 +609,7 @@ int onlp_sysi_platform_manage_fans(void)
                 }
             }
             else
-            {                
+            {
                 if (thermal[i].mcelsius <= afo_thermal_spec.max_to_mid_temp[i])
                 {
                     max_to_mid++;
@@ -651,8 +658,7 @@ int onlp_sysi_platform_manage_fans(void)
             {
                 current_state=LEVEL_FAN_MID;
             }
-           
-             
+
             if (fan_alarm_state)
             {
                 fan_alarm_state=0;
@@ -713,7 +719,7 @@ int onlp_sysi_platform_manage_fans(void)
             }
             break;
         }
-        fan_fail=0;           	    
+        fan_fail=0;
     }
     if(current_state!=ori_state)
     {
@@ -729,13 +735,13 @@ int onlp_sysi_platform_manage_fans(void)
             onlp_fani_percentage_set(ONLP_FAN_ID_CREATE(1), FAN_DUTY_CYCLE_MAX);
         }
     }
-  
+
     return 0;
-}   
+}
 
 int
 onlp_sysi_platform_manage_leds(void)
 {
     return ONLP_STATUS_E_UNSUPPORTED;
 }
-   
+
